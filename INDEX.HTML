@@ -375,34 +375,6 @@
                 { id: 124, name: "AROMATIZANTE GLADE AEROSOL COCO 12/ 275 ML", category: "nuevos_productos", image: "https://www.dropbox.com/scl/fi/5qdopfwfxft5qt61pzi59/7503049616292.jpg?rlkey=ua0g23y66hyavnadtftdecsjm&st=b1w3q7mx&raw=1", specs: ["Clave Z: 378413", "Clave SCJ: 378413", "UPC: 7503049616292"] , price: 0 },
 
 
-                // Manual entries placeholders (12-124)
-                ...Array.from({length: 113}, (_, i) => {
-                    const id = i + 12;
-                    let cat = 'pest_control';
-                    let brand = 'Generica';
-                    if (id >= 12 && id <= 14) { cat = 'home_cleaning'; brand = 'Pato'; }
-                    else if (id >= 15 && id <= 17) { cat = 'home_cleaning'; brand = 'Windex'; }
-                    else if (id >= 18 && id <= 19) { cat = 'home_cleaning'; brand = 'Drano'; }
-                    else if (id >= 20 && id <= 22) { cat = 'home_cleaning'; brand = 'Mr. Musculo'; }
-                    else if (id >= 23 && id <= 24) { cat = 'home_cleaning'; brand = 'Pledge'; }
-                    else if (id >= 25 && id <= 26) { cat = 'home_cleaning'; brand = 'Family Guard'; }
-                    else if (id >= 27 && id <= 29) { cat = 'pest_control'; brand = 'Baygon'; }
-                    else if (id >= 30 && id <= 32) { cat = 'pest_control'; brand = 'Off'; }
-                    else if (id >= 33 && id <= 35) { cat = 'air_care'; brand = 'Glade'; }
-                    else if (id >= 36 && id <= 37) { cat = 'home_storage'; brand = 'Ziploc'; }
-                    else if (id >= 103 && id <= 112) { cat = 'npds'; }
-                    else if (id >= 113) { cat = 'nuevos_productos'; }
-
-                    return {
-                        id: id,
-                        name: `PRODUCTO MANUAL ${id}`,
-                        category: cat,
-                        brand: brand,
-                        image: "",
-                        specs: ["Dato 1: Valor"],
-                        price: parseFloat((id * 15.5).toFixed(2))
-                    };
-                }).filter(p => p.id !== 62), // Filter out 62 to add explicitly
                 { id: 62, name: "Raidolito Espirales 12pz", category: "pest_control", brand: "Raidolito", image: "https://images.unsplash.com/photo-1596627606373-195977a49936?w=500&q=80", specs: ["Contenido: 12 espirales", "Duración: 4 horas", "Uso: Exterior"] , price: 961.0 }
             ];
         };
@@ -493,7 +465,9 @@
                         <td class="p-3 text-gray-900 font-medium">${item.clave}</td>
                         <td class="p-3 text-gray-700 max-w-xs truncate" title="${item.name}">${item.name}</td>
                         <td class="p-3 text-gray-700 text-right">$${item.unitPrice.toFixed(2)}</td>
-                        <td class="p-3 text-gray-700 text-center">${item.qty}</td>
+                        <td class="p-3 text-gray-700 text-center">
+                            <input type="number" min="1" value="${item.qty}" onchange="updateCalcItemQty(${index}, this.value)" class="w-16 px-2 py-1 border border-gray-200 rounded text-center focus:outline-none focus:border-blue-500">
+                        </td>
                         <td class="p-3 font-semibold text-gray-900 text-right flex justify-end items-center gap-4">
                             $${item.total.toFixed(2)}
                             <button onclick="removeCalcItem(${index})" class="text-gray-300 hover:text-red-500 transition opacity-0 group-hover:opacity-100">×</button>
@@ -507,6 +481,14 @@
             // Update date
             const dateStr = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             document.getElementById('calc-date').innerText = "Generado: " + dateStr;
+        }
+
+        function updateCalcItemQty(index, newQty) {
+            const qty = parseInt(newQty);
+            if (isNaN(qty) || qty <= 0) return;
+            calcItems[index].qty = qty;
+            calcItems[index].total = parseFloat((calcItems[index].unitPrice * qty).toFixed(2));
+            renderCalcTable();
         }
 
         function removeCalcItem(index) {
@@ -534,7 +516,20 @@
             btn.innerHTML = '⏳ Generando...';
             btn.disabled = true;
 
-            html2pdf().set(opt).from(element).save().then(() => {
+            html2pdf().set(opt).from(element).outputPdf('blob').then((pdfBlob) => {
+                const url = URL.createObjectURL(pdfBlob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = opt.filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }).catch(err => {
+                console.error("PDF generation error", err);
+                alert("Hubo un error al generar el PDF. Asegúrate de estar usando un navegador moderno.");
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             });
@@ -696,13 +691,16 @@
 
             list.forEach(p => {
                 let imgUrl = p.image;
-                if (!imgUrl || imgUrl === "") imgUrl = "https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image";
-                if (imgUrl.includes('dropbox') || imgUrl.includes('drive')) imgUrl = formatImageUrl(imgUrl);
+                if (!imgUrl || imgUrl === "") {
+                    imgUrl = "https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image";
+                } else {
+                    imgUrl = formatImageUrl(imgUrl);
+                }
 
                 const card = `
                     <div class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition cursor-pointer group flex flex-col overflow-hidden" onclick="openProductDetails(${p.id})">
                         <div class="h-48 overflow-hidden bg-gray-50 relative">
-                            <img src="${imgUrl}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500" onerror="this.src='https://via.placeholder.com/400?text=Error'">
+                            <img src="${imgUrl}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-500" onerror="this.src='https://via.placeholder.com/400?text=Error'">
                             <span class="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider text-blue-600 shadow-sm border border-blue-100">${p.category.replace('_', ' ')}</span>
                         </div>
                         <div class="p-4 flex flex-col flex-grow">
@@ -720,14 +718,19 @@
 
         // --- UTILS & AI ---
         function formatImageUrl(url) {
+            let finalUrl = url;
             if (url && url.includes('drive.google.com') && url.includes('/file/d/')) {
                 const idMatch = url.match(/\/d\/(.*?)\//);
-                if (idMatch && idMatch[1]) return `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
+                if (idMatch && idMatch[1]) finalUrl = `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
+            } else if (url && url.includes('dropbox.com')) {
+                finalUrl = url.replace('dl=0', 'raw=1');
             }
-            if (url && url.includes('dropbox.com')) {
-                return url.replace('dl=0', 'raw=1');
+
+            // Use wsrv.nl to optimize image size and quality for external links
+            if (finalUrl && finalUrl.startsWith('http')) {
+                return `https://wsrv.nl/?url=${encodeURIComponent(finalUrl)}&w=300&q=50`;
             }
-            return url;
+            return finalUrl;
         }
 
         // --- MODALS ---
@@ -738,7 +741,7 @@
             document.getElementById('modalCategoryBadge').innerText = p.category.replace('_',' ');
 
             let imgUrl = p.image || "https://via.placeholder.com/400?text=No+Image";
-            if (imgUrl.includes('drive') || imgUrl.includes('dropbox')) imgUrl = formatImageUrl(imgUrl);
+            if (imgUrl.startsWith('http')) imgUrl = formatImageUrl(imgUrl);
             document.getElementById('modalImg').src = imgUrl;
 
             const specs = document.getElementById('modalSpecs');
