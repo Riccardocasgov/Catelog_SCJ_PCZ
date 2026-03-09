@@ -6,6 +6,7 @@
     <title>Catálogo PCZ - Dashboard Interactivo</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
@@ -24,9 +25,9 @@
         }
         .fade-in { animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        
+
         .nav-active { border-bottom: 2px solid #2563EB; color: #2563EB; }
-        
+
         /* Chat Widget Styles */
         .chat-messages::-webkit-scrollbar { width: 6px; }
         .chat-messages::-webkit-scrollbar-track { background: #f1f1f1; }
@@ -37,7 +38,7 @@
         @keyframes typing { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
     </style>
     <!-- Chosen Palette: Blue Professional (Tailwind Blue-600 focus) -->
-    <!-- Application Structure Plan: 
+    <!-- Application Structure Plan:
          1. Dashboard View: Provides a high-level overview of the catalog inventory using data visualization (Charts) to understand category and brand distribution. This answers "What do we have?".
          2. Catalog View: The core exploration tool. Allows detailed filtering, searching, and product inspection. This answers "Where is specific item X?".
          3. Navigation: Simple tab-based switching for a seamless SPA experience without page reloads.
@@ -57,6 +58,7 @@
                 <nav class="flex gap-6">
                     <button onclick="switchView('dashboard')" id="nav-dashboard" class="px-3 py-2 font-medium text-gray-500 hover:text-blue-600 transition nav-active">Dashboard</button>
                     <button onclick="switchView('catalog')" id="nav-catalog" class="px-3 py-2 font-medium text-gray-500 hover:text-blue-600 transition">Explorar Productos</button>
+                    <button onclick="switchView('calculator')" id="nav-calculator" class="px-3 py-2 font-medium text-gray-500 hover:text-blue-600 transition">Calculadora de Costos</button>
                 </nav>
             </div>
         </div>
@@ -70,7 +72,7 @@
             <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <h1 class="text-3xl font-bold text-gray-900 mb-2">Resumen de Inventario</h1>
                 <p class="text-gray-600">Visualización estratégica del portafolio de productos. Analice la distribución por categorías y la presencia de marcas clave.</p>
-                
+
                 <!-- KPIs -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                     <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
@@ -119,10 +121,10 @@
             <div class="mb-8 text-center">
                 <h2 class="text-3xl font-bold text-gray-900 mb-2">Explorador de Productos</h2>
                 <p class="text-gray-600 mb-6">Utilice los filtros y la búsqueda inteligente para localizar artículos específicos por nombre, código o características.</p>
-                
+
                 <!-- Search Bar -->
                 <div class="relative w-full max-w-2xl mx-auto mb-6">
-                    <input type="text" id="searchInput" placeholder="🔍 Buscar por Nombre, Clave Z, SCJ, UPC..." 
+                    <input type="text" id="searchInput" placeholder="🔍 Buscar por Nombre, Clave Z, SCJ, UPC..."
                         class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition">
                     <span class="absolute left-3 top-3.5 text-gray-400"></span>
                 </div>
@@ -146,6 +148,63 @@
             <!-- Product Grid -->
             <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 <!-- Cards injected via JS -->
+            </div>
+        </section>
+
+        <!-- VIEW 3: CALCULATOR (Calculadora de Costos) -->
+        <section id="view-calculator" class="hidden fade-in space-y-8">
+            <div class="mb-8 text-center">
+                <h2 class="text-3xl font-bold text-gray-900 mb-2">Calculadora de Costos</h2>
+                <p class="text-gray-600 mb-6">Ingrese la clave del producto y la cantidad de cajas para generar un listado de costos.</p>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 max-w-3xl mx-auto flex flex-col md:flex-row gap-4 items-end">
+                    <div class="flex-grow w-full">
+                        <label class="block text-sm font-medium text-gray-700 text-left mb-1">Clave del Producto (Z, SCJ o UPC)</label>
+                        <input type="text" id="calc-clave" placeholder="Ej: 320001" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="w-full md:w-1/3">
+                        <label class="block text-sm font-medium text-gray-700 text-left mb-1">Cantidad de Cajas</label>
+                        <input type="number" id="calc-qty" min="1" value="1" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <button onclick="addCalcItem()" class="w-full md:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition">Agregar</button>
+                </div>
+            </div>
+
+            <!-- List Output for PDF generation -->
+            <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-5xl mx-auto" id="calc-export-area">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-gray-900">Listado de Productos</h3>
+                    <div class="text-sm text-gray-500" id="calc-date"></div>
+                </div>
+
+                <div class="overflow-x-auto w-full">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200 text-sm">
+                                <th class="p-3 font-semibold text-gray-700 rounded-tl-lg">Clave</th>
+                                <th class="p-3 font-semibold text-gray-700">Nombre</th>
+                                <th class="p-3 font-semibold text-gray-700 text-right">Precio Unitario</th>
+                                <th class="p-3 font-semibold text-gray-700 text-center">Cajas</th>
+                                <th class="p-3 font-semibold text-gray-700 text-right rounded-tr-lg">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="calc-table-body" class="text-sm text-gray-600 divide-y divide-gray-100">
+                            <tr><td colspan="5" class="p-4 text-center text-gray-400 italic">No hay productos ingresados.</td></tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="bg-blue-50 border-t border-blue-100">
+                                <td colspan="4" class="p-3 text-right font-bold text-gray-800">Gran Total:</td>
+                                <td class="p-3 font-bold text-blue-700 text-lg text-right" id="calc-total-summary">$0.00</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <div class="flex justify-center mt-4">
+                <button onclick="generateCalcPDF()" class="px-8 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-full shadow-lg transition flex items-center gap-2">
+                    📄 Generar PDF
+                </button>
             </div>
         </section>
 
@@ -346,7 +405,7 @@
                 { id: 102, name: "ZIPLOC SANDWICH 50u", category: "home_storage", brand: "Ziploc", image: "https://www.dropbox.com/scl/fi/9moj3dj6uwnn0iq9uqhox/7501032990053-1.jpg?rlkey=y2iqrstfpc24mif0fzjma75ry&st=fkrg96ah&raw=1", specs: ["Clave Z: 40192", "Clave SCJ: 364954", "UPC: 7501032990053"] },
                 { id: 103, name: "ZIPLOC CIERRE FACIL GRANDE 10u", category: "home_storage", brand: "Ziploc", image: "https://www.dropbox.com/scl/fi/4sl9kfgg6qiuuuops9r0b/7501032900335-1.jpg?rlkey=o41zotkk1p6hfsc4tyo7ro1nn&st=yle7fped&raw=1", specs: ["Clave Z: 40321", "Clave SCJ: 317033", "UPC: 7501032900335"] },
                 { id: 104, name: "ZIPLOC CIERRE FACIL MEDIANA 15u", category: "home_storage", brand: "Ziploc", image: "https://www.dropbox.com/scl/fi/49byuuwsaa4t1jwnqphmk/7501032900342-1.jpg?rlkey=4rr6n38dylaqwtnwntp4wpjp6&st=1c2dxrb9&raw=1", specs: ["Clave Z: 40322", "Clave SCJ: 317034", "UPC: 7501032900342"] },
-                { id: 105, name: "INSECTICIDA RAID ESPIRALES RAIDOLITO VERDE Y LAVANDA 6 /50 UD", category: "npds", image: "", specs: ["Clave Z: 320340", "Clave SCJ: 379135", "UPC: 7503049616674"] }, //No se encontró imagen 
+                { id: 105, name: "INSECTICIDA RAID ESPIRALES RAIDOLITO VERDE Y LAVANDA 6 /50 UD", category: "npds", image: "", specs: ["Clave Z: 320340", "Clave SCJ: 379135", "UPC: 7503049616674"] }, //No se encontró imagen
                 { id: 106, name: "OFF SPRAY FAMILY 100ml/12", category: "npds", image: "https://www.dropbox.com/scl/fi/ser0cm8f18srkz4fpdl0o/07503051868238.jpg?rlkey=f6fpw30d1qakssqnf3mtlpa92&st=mkdqt0n8&raw=1", specs: ["Clave Z: 320354", "Clave SCJ: 386308", "UPC: 7503051868238"] },
                 { id: 107, name: "AROMATIZANTE GLADE MINI GEL ALEGRIA FLORAL Y FRUTOS 12/70", category: "npds", image: "https://www.dropbox.com/scl/fi/6z8i3d0ceshyz41mq4x0q/7591005998308.jpg?rlkey=9ooakzs8wm3svsyj6obbrnwkb&st=89ceflw0&raw=1", specs: ["Clave Z: 790474", "Clave SCJ: 344522", "UPC: 7591005998308"] },
                 { id: 108, name: "AROMATIZANTE GLADE MINI GEL LAVANDA 12/70", category: "npds", image: "https://www.dropbox.com/scl/fi/zmtw2q98v21fju4tt9916/7591005998292.jpg?rlkey=4hxvtuvt2gph44uu5fic67o95&st=f229eobc&raw=1", specs: ["Clave Z: 790475", "Clave SCJ: 378529", "UPC: 7591005998292"] },
@@ -379,14 +438,14 @@
                     else if (id >= 36 && id <= 37) { cat = 'home_storage'; brand = 'Ziploc'; }
                     else if (id >= 103 && id <= 112) { cat = 'npds'; }
                     else if (id >= 113) { cat = 'nuevos_productos'; }
-                    
-                    return { 
-                        id: id, 
-                        name: `PRODUCTO MANUAL ${id}`, 
-                        category: cat, 
-                        brand: brand, 
-                        image: "", 
-                        specs: ["Dato 1: Valor"] 
+
+                    return {
+                        id: id,
+                        name: `PRODUCTO MANUAL ${id}`,
+                        category: cat,
+                        brand: brand,
+                        image: "",
+                        specs: ["Dato 1: Valor"]
                     };
                 }).filter(p => p.id !== 62), // Filter out 62 to add explicitly
                 { id: 62, name: "Raidolito Espirales 12pz", category: "pest_control", brand: "Raidolito", image: "https://images.unsplash.com/photo-1596627606373-195977a49936?w=500&q=80", specs: ["Contenido: 12 espirales", "Duración: 4 horas", "Uso: Exterior"] }
@@ -394,19 +453,137 @@
         };
 
         let products = generateProducts();
-        let chatHistory = []; 
+        let chatHistory = [];
+        let calcItems = [];
 
         // --- APP STATE & NAVIGATION ---
         function switchView(viewName) {
             document.getElementById('view-dashboard').classList.add('hidden');
             document.getElementById('view-catalog').classList.add('hidden');
+            document.getElementById('view-calculator').classList.add('hidden');
             document.getElementById('nav-dashboard').classList.remove('nav-active');
             document.getElementById('nav-catalog').classList.remove('nav-active');
+            document.getElementById('nav-calculator').classList.remove('nav-active');
 
             document.getElementById(`view-${viewName}`).classList.remove('hidden');
             document.getElementById(`nav-${viewName}`).classList.add('nav-active');
 
             if (viewName === 'dashboard') updateDashboard();
+        }
+
+        // --- CALCULATOR LOGIC ---
+        function addCalcItem() {
+            const claveInput = document.getElementById('calc-clave').value.trim();
+            const qtyInput = parseInt(document.getElementById('calc-qty').value);
+
+            if (!claveInput || isNaN(qtyInput) || qtyInput <= 0) {
+                alert("Por favor ingrese una clave válida y una cantidad mayor a 0.");
+                return;
+            }
+
+            // Find product matching Clave Z, Clave SCJ, or UPC in specs array
+            const product = products.find(p => {
+                if (!p.specs) return false;
+                return p.specs.some(spec => spec.includes(claveInput));
+            });
+
+            if (!product) {
+                alert("Producto no encontrado con esa clave.");
+                return;
+            }
+
+            // Dummy unit price for demonstration (using id * 15.5 to get a realistic looking float)
+            const unitPrice = parseFloat((product.id * 15.5).toFixed(2));
+            const total = parseFloat((unitPrice * qtyInput).toFixed(2));
+
+            // Extract the actual matched key for display
+            let displayClave = claveInput;
+            product.specs.forEach(s => {
+                if(s.includes(claveInput)) {
+                    displayClave = s.split(':')[1]?.trim() || claveInput;
+                }
+            });
+
+            calcItems.push({
+                clave: displayClave,
+                name: product.name,
+                unitPrice: unitPrice,
+                qty: qtyInput,
+                total: total
+            });
+
+            // Reset inputs
+            document.getElementById('calc-clave').value = '';
+            document.getElementById('calc-qty').value = '1';
+
+            renderCalcTable();
+        }
+
+        function renderCalcTable() {
+            const tbody = document.getElementById('calc-table-body');
+            const summary = document.getElementById('calc-total-summary');
+
+            if (calcItems.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-400 italic">No hay productos ingresados.</td></tr>';
+                summary.innerText = "$0.00";
+                return;
+            }
+
+            tbody.innerHTML = '';
+            let grandTotal = 0;
+
+            calcItems.forEach((item, index) => {
+                grandTotal += item.total;
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50 transition border-b border-gray-100 last:border-0 group">
+                        <td class="p-3 text-gray-900 font-medium">${item.clave}</td>
+                        <td class="p-3 text-gray-700 max-w-xs truncate" title="${item.name}">${item.name}</td>
+                        <td class="p-3 text-gray-700 text-right">$${item.unitPrice.toFixed(2)}</td>
+                        <td class="p-3 text-gray-700 text-center">${item.qty}</td>
+                        <td class="p-3 font-semibold text-gray-900 text-right flex justify-end items-center gap-4">
+                            $${item.total.toFixed(2)}
+                            <button onclick="removeCalcItem(${index})" class="text-gray-300 hover:text-red-500 transition opacity-0 group-hover:opacity-100">×</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            summary.innerText = "$" + grandTotal.toFixed(2);
+
+            // Update date
+            const dateStr = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            document.getElementById('calc-date').innerText = "Generado: " + dateStr;
+        }
+
+        function removeCalcItem(index) {
+            calcItems.splice(index, 1);
+            renderCalcTable();
+        }
+
+        function generateCalcPDF() {
+            if (calcItems.length === 0) {
+                alert("No hay productos en la lista para exportar.");
+                return;
+            }
+            const element = document.getElementById('calc-export-area');
+            const opt = {
+                margin:       [15, 15, 15, 15],
+                filename:     'Listado_Costos_PCZ.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            // Add a temporary loading state to the button
+            const btn = document.querySelector('button[onclick="generateCalcPDF()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ Generando...';
+            btn.disabled = true;
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
         }
 
         // --- DASHBOARD LOGIC (Visualization) ---
@@ -426,7 +603,7 @@
             // Prepare Chart Data
             const catCounts = {};
             products.forEach(p => catCounts[p.category] = (catCounts[p.category] || 0) + 1);
-            
+
             const brandCounts = {};
             products.forEach(p => {
                 if (p.brand !== 'Generica') brandCounts[p.brand] = (brandCounts[p.brand] || 0) + 1;
@@ -495,17 +672,17 @@
         }
 
         // --- CATALOG LOGIC ---
-        
+
         // Setup Filter Buttons
         function initFilters() {
             const container = document.getElementById('categoryFilters');
             const cats = ['todos', 'pest_control', 'home_cleaning', 'air_care', 'home_storage', 'npds', 'nuevos_productos'];
-            
+
             container.innerHTML = cats.map(cat => {
                 const label = cat === 'todos' ? 'Todos' : cat.replace(/_/g, ' ').toUpperCase();
                 return `<button onclick="filterProducts('${cat}')" class="filter-btn px-4 py-2 rounded-full text-sm font-semibold border border-gray-200 bg-white text-gray-600 hover:bg-blue-50 hover:border-blue-300 transition" data-cat="${cat}">${label}</button>`;
             }).join('');
-            
+
             // Set initial active
             filterProducts('todos');
         }
@@ -522,7 +699,7 @@
             const subFilters = document.getElementById('subFilters');
             const brandContainer = document.getElementById('brandButtons');
             brandContainer.innerHTML = '';
-            
+
             let brandsToShow = [];
             if (category === 'pest_control') brandsToShow = ['Raid', 'Baygon', 'Off', 'Raidolito', "Laminitas", "Aparatos"];
             else if (category === 'home_cleaning') brandsToShow = ['Pato', 'Pledge', 'Family Guard', 'Drano', 'Windex', 'Mr. Musculo'];
@@ -532,7 +709,7 @@
             if (brandsToShow.length > 0) {
                 subFilters.classList.remove('hidden');
                 subFilters.classList.add('flex');
-                brandContainer.innerHTML = brandsToShow.map(b => 
+                brandContainer.innerHTML = brandsToShow.map(b =>
                     `<button onclick="filterByBrand('${b}', '${category}')" class="brand-btn px-3 py-1 rounded-full text-xs border border-gray-300 bg-white text-gray-600 hover:border-blue-500 hover:text-blue-600 transition">${b}</button>`
                 ).join('');
             } else {
@@ -607,7 +784,7 @@
             document.getElementById('magicModalProductName').innerText = p.name;
             document.getElementById('magicModalContent').innerHTML = '<span class="typing-dot">.</span><span class="typing-dot">.</span><span class="typing-dot">.</span>';
             modal.classList.remove('hidden');
-            
+
             const prompt = `Escribe una descripción comercial corta y atractiva para el producto: ${p.name} (Marca: ${p.brand}, Categoría: ${p.category}). Usa emojis.`;
             const text = await callGemini(prompt, "Eres un copywriter experto en marketing.");
             document.getElementById('magicModalContent').innerText = text;
@@ -616,7 +793,7 @@
         async function callGemini(prompt, sys) {
             // Placeholder API logic
             if(!apiKey) return "⚠️ API Key no configurada. Por favor edita el código fuente para añadir tu clave de Google Gemini.";
-            
+
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             try {
                 const res = await fetch(url, {
@@ -635,7 +812,7 @@
             if(!p) return;
             document.getElementById('modalTitle').innerText = p.name;
             document.getElementById('modalCategoryBadge').innerText = p.category.replace('_',' ');
-            
+
             let imgUrl = p.image || "https://via.placeholder.com/400?text=No+Image";
             if (imgUrl.includes('drive') || imgUrl.includes('dropbox')) imgUrl = formatImageUrl(imgUrl);
             document.getElementById('modalImg').src = imgUrl;
@@ -652,7 +829,7 @@
 
         function closeProductModal() { document.getElementById('productModal').classList.add('hidden'); }
         function closeMagicModal() { document.getElementById('magicModal').classList.add('hidden'); }
-        
+
         function toggleChat() {
             const win = document.getElementById('chatWindow');
             win.classList.toggle('hidden');
@@ -664,7 +841,7 @@
             const input = document.getElementById('chatInput');
             const txt = input.value.trim();
             if(!txt) return;
-            
+
             const cont = document.getElementById('chatMessages');
             cont.innerHTML += `<div class="flex items-start gap-2.5 flex-row-reverse animate-fade-in"><div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs">Tú</div><div class="bg-blue-600 text-white p-3 rounded-2xl rounded-tr-none text-sm shadow-sm max-w-[85%]">${txt}</div></div>`;
             input.value = '';
@@ -678,7 +855,7 @@
             const context = products.slice(0, 30).map(p => `${p.name} (${p.brand})`).join(", ");
             const prompt = `Contexto del catálogo: ${context}. Usuario pregunta: ${txt}`;
             const reply = await callGemini(prompt, "Eres un asistente de ventas útil y breve.");
-            
+
             document.getElementById(loadId).remove();
             cont.innerHTML += `<div class="flex items-start gap-2.5 animate-fade-in"><div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-xs">🤖</div><div class="bg-white p-3 rounded-2xl rounded-tl-none text-sm text-gray-700 shadow-sm border border-gray-100">${reply}</div></div>`;
             cont.scrollTop = cont.scrollHeight;
@@ -687,8 +864,8 @@
         // Search Listener
         document.getElementById('searchInput').addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
-            const matches = products.filter(p => 
-                p.name.toLowerCase().includes(term) || 
+            const matches = products.filter(p =>
+                p.name.toLowerCase().includes(term) ||
                 (p.specs && p.specs.some(s => s.toLowerCase().includes(term)))
             );
             renderProducts(matches);
@@ -703,7 +880,7 @@
 
     </script>
     <!-- CONFIRMATION: NO SVG graphics used (replaced with Unicode chars/CSS). NO Mermaid JS used. -->
-    <!-- Visualization & Content Choices: 
+    <!-- Visualization & Content Choices:
          - Dashboard: Chart.js for aggregation. Useful for managers.
          - Grid: Standard HTML for item browsing.
          - No SVG: Unicode chars used for icons (search, close, chat).
