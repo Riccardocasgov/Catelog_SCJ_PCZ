@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo PCZ - Dashboard Interactivo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container { height: 350px; }
+        }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .nav-active { border-bottom: 2px solid #2563EB; color: #2563EB; }
+    </style>
+</head>
+<body class="text-gray-800 flex flex-col min-h-screen">
+
+    <!-- Header & Navigation -->
+    <header class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">📦</span>
+                    <span class="text-2xl font-bold text-blue-600">Catálogo <span class="text-gray-800">PCZ</span></span>
+                </div>
+                <nav class="flex gap-4 items-center">
+                    <button onclick="switchView('dashboard')" id="nav-dashboard" class="px-3 py-2 font-medium text-gray-500 hover:text-blue-600 transition nav-active">Dashboard</button>
+                    <button onclick="switchView('catalog')" id="nav-catalog" class="px-3 py-2 font-medium text-gray-500 hover:text-blue-600 transition">Explorar Productos</button>
+                    <button onclick="switchView('calculator')" id="nav-calculator" class="px-3 py-2 font-medium text-gray-500 hover:text-blue-600 transition">Calculadora de Costos</button>
+                    <a href="/admin.html" class="ml-4 px-3 py-1.5 text-xs font-semibold text-gray-400 border border-gray-200 rounded-lg hover:text-blue-600 hover:border-blue-300 transition">Admin</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- VIEW 1: DASHBOARD -->
+        <section id="view-dashboard" class="fade-in space-y-8">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Resumen de Inventario</h1>
+                <p class="text-gray-600">Visualización estratégica del portafolio de productos.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                        <div class="text-blue-600 text-sm font-bold uppercase">Total SKUs</div>
+                        <div class="text-3xl font-bold text-gray-900" id="kpi-total">0</div>
+                    </div>
+                    <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                        <div class="text-indigo-600 text-sm font-bold uppercase">Categorías</div>
+                        <div class="text-3xl font-bold text-gray-900" id="kpi-categories">0</div>
+                    </div>
+                    <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                        <div class="text-emerald-600 text-sm font-bold uppercase">Marcas Activas</div>
+                        <div class="text-3xl font-bold text-gray-900" id="kpi-brands">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Distribución por Categoría</h3>
+                    <p class="text-sm text-gray-500 mb-4">Proporción de productos asignados a cada segmento de negocio.</p>
+                    <div class="flex-grow flex items-center justify-center">
+                        <div class="chart-container"><canvas id="categoryChart"></canvas></div>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Top Marcas por Volumen</h3>
+                    <p class="text-sm text-gray-500 mb-4">Cantidad de SKUs disponibles por marca principal.</p>
+                    <div class="flex-grow flex items-center justify-center">
+                        <div class="chart-container"><canvas id="brandChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW 2: CATALOG -->
+        <section id="view-catalog" class="hidden fade-in">
+            <div class="mb-8 text-center">
+                <h2 class="text-3xl font-bold text-gray-900 mb-2">Explorador de Productos</h2>
+                <p class="text-gray-600 mb-6">Utilice los filtros y la búsqueda para localizar artículos por nombre, código o características.</p>
+                <div class="relative w-full max-w-2xl mx-auto mb-6">
+                    <input type="text" id="searchInput" placeholder="🔍 Buscar por Nombre, Clave Z, SCJ, UPC..."
+                        class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition">
+                </div>
+                <div class="flex flex-wrap items-center gap-2 justify-center mb-4" id="categoryFilters"></div>
+                <div id="subFilters" class="hidden animate-fade-in bg-white p-3 rounded-xl border border-gray-200 max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-2 shadow-sm">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wide mr-2">Filtrar Marca:</span>
+                    <div id="brandButtons" class="flex flex-wrap justify-center gap-2"></div>
+                </div>
+            </div>
+            <div class="flex justify-between items-center mb-4 px-2">
+                <span class="text-sm text-gray-500">Resultados: <strong id="productCount" class="text-gray-900">0</strong></span>
+            </div>
+            <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+        </section>
+
+        <!-- VIEW 3: CALCULATOR -->
+        <section id="view-calculator" class="hidden fade-in space-y-8">
+            <div class="mb-8 text-center">
+                <h2 class="text-3xl font-bold text-gray-900 mb-2">Calculadora de Costos</h2>
+                <p class="text-gray-600 mb-6">Ingrese la clave del producto y la cantidad de cajas para generar un listado de costos.</p>
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 max-w-3xl mx-auto flex flex-col md:flex-row gap-4 items-end">
+                    <div class="flex-grow w-full">
+                        <label class="block text-sm font-medium text-gray-700 text-left mb-1">Clave del Producto (Z, SCJ o UPC)</label>
+                        <input type="text" id="calc-clave" placeholder="Ej: 320001" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="w-full md:w-1/3">
+                        <label class="block text-sm font-medium text-gray-700 text-left mb-1">Cantidad de Cajas</label>
+                        <input type="number" id="calc-qty" min="1" value="1" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <button onclick="addCalcItem()" class="w-full md:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition">Agregar</button>
+                </div>
+            </div>
+            <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-5xl mx-auto" id="calc-export-area">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-gray-900">Listado de Productos</h3>
+                    <div class="text-sm text-gray-500" id="calc-date"></div>
+                </div>
+                <div class="overflow-x-auto w-full">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200 text-sm">
+                                <th class="p-3 font-semibold text-gray-700 rounded-tl-lg">Clave</th>
+                                <th class="p-3 font-semibold text-gray-700">Nombre</th>
+                                <th class="p-3 font-semibold text-gray-700 text-right">Precio Unitario</th>
+                                <th class="p-3 font-semibold text-gray-700 text-center">Cajas</th>
+                                <th class="p-3 font-semibold text-gray-700 text-right rounded-tr-lg">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="calc-table-body" class="text-sm text-gray-600 divide-y divide-gray-100">
+                            <tr><td colspan="5" class="p-4 text-center text-gray-400 italic">No hay productos ingresados.</td></tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="bg-blue-50 border-t border-blue-100">
+                                <td colspan="4" class="p-3 text-right font-bold text-gray-800">Gran Total:</td>
+                                <td class="p-3 font-bold text-blue-700 text-lg text-right" id="calc-total-summary">$0.00</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            <div class="flex justify-center mt-4">
+                <button onclick="generateCalcXLSX()" class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full shadow-lg transition flex items-center gap-2">
+                    📄 Generar Excel
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal Details -->
+    <div id="productModal" class="fixed inset-0 bg-black/50 z-[90] hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
+            <div class="relative w-full md:w-1/2 h-64 md:h-auto bg-gray-100 flex items-center justify-center">
+                <img id="modalImg" class="max-w-full max-h-full object-contain p-4" alt="Product Image">
+                <span id="modalCategoryBadge" class="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-blue-600 shadow-sm"></span>
+            </div>
+            <div class="w-full md:w-1/2 p-8 flex flex-col bg-white overflow-y-auto">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 id="modalTitle" class="text-2xl font-bold text-gray-900 leading-tight"></h3>
+                    <button onclick="closeProductModal()" class="text-gray-400 hover:text-red-500 text-2xl leading-none">×</button>
+                </div>
+                <div id="modalDescription" class="text-sm text-gray-600 mb-4 hidden"></div>
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-6">
+                    <h4 class="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm uppercase tracking-wide">
+                        📋 Ficha Técnica
+                    </h4>
+                    <ul id="modalSpecs" class="space-y-2 text-sm text-gray-700"></ul>
+                </div>
+                <div class="mt-auto pt-4 border-t border-gray-100 flex justify-end">
+                    <button onclick="closeProductModal()" class="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 mt-auto py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center md:text-left flex flex-col md:flex-row justify-between items-center text-xs text-gray-500">
+            <p>&copy; <span id="currentYear"></span> Catálogo PCZ. Uso interno.</p>
+            <p>Última actualización: <span id="lastUpdateDisplay" class="font-semibold text-gray-700"></span></p>
+        </div>
+    </footer>
+
+    <script>
+        const appConfig = { lastUpdate: "9 de Marzo de 2026" };
+
+        let products = [];
+        let calcItems = [];
+
+        // --- DATA LOADING ---
+        async function loadProducts(params = {}) {
+            const query = new URLSearchParams(params).toString();
+            const url = '/api/products' + (query ? '?' + query : '');
+            const res = await fetch(url);
+            return await res.json();
+        }
+
+        async function init() {
+            products = await loadProducts();
+            document.getElementById('lastUpdateDisplay').innerText = appConfig.lastUpdate;
+            document.getElementById('currentYear').innerText = new Date().getFullYear();
+            initFilters();
+            switchView('dashboard');
+        }
+
+        // --- NAVIGATION ---
+        function switchView(viewName) {
+            document.getElementById('view-dashboard').classList.add('hidden');
+            document.getElementById('view-catalog').classList.add('hidden');
+            document.getElementById('view-calculator').classList.add('hidden');
+            document.getElementById('nav-dashboard').classList.remove('nav-active');
+            document.getElementById('nav-catalog').classList.remove('nav-active');
+            document.getElementById('nav-calculator').classList.remove('nav-active');
+
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+            document.getElementById(`nav-${viewName}`).classList.add('nav-active');
+
+            if (viewName === 'dashboard') updateDashboard();
+        }
+
+        // --- CALCULATOR ---
+        function addCalcItem() {
+            const claveInput = document.getElementById('calc-clave').value.trim().toLowerCase();
+            const qtyInput = parseInt(document.getElementById('calc-qty').value);
+
+            if (!claveInput || isNaN(qtyInput) || qtyInput <= 0) {
+                alert("Por favor ingrese una clave válida y una cantidad mayor a 0.");
+                return;
+            }
+
+            let product = null;
+            let matchedClave = '';
+
+            for (const p of products) {
+                if (p.clave_z && p.clave_z.toLowerCase() === claveInput) {
+                    product = p; matchedClave = 'Clave Z: ' + p.clave_z; break;
+                }
+                if (p.clave_scj && p.clave_scj.toLowerCase() === claveInput) {
+                    product = p; matchedClave = 'Clave SCJ: ' + p.clave_scj; break;
+                }
+                if (p.upc && p.upc.toLowerCase() === claveInput) {
+                    product = p; matchedClave = 'UPC: ' + p.upc; break;
+                }
+            }
+
+            if (!product) {
+                alert("Producto no encontrado con esa clave.");
+                return;
+            }
+
+            const unitPrice = product.price;
+            const total = parseFloat((unitPrice * qtyInput).toFixed(2));
+
+            calcItems.push({
+                clave: matchedClave,
+                name: product.name,
+                unitPrice: unitPrice,
+                qty: qtyInput,
+                total: total
+            });
+
+            document.getElementById('calc-clave').value = '';
+            document.getElementById('calc-qty').value = '1';
+            renderCalcTable();
+        }
+
+        function renderCalcTable() {
+            const tbody = document.getElementById('calc-table-body');
+            const summary = document.getElementById('calc-total-summary');
+
+            if (calcItems.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-400 italic">No hay productos ingresados.</td></tr>';
+                summary.innerText = "$0.00";
+                return;
+            }
+
+            tbody.innerHTML = '';
+            let grandTotal = 0;
+
+            calcItems.forEach((item, index) => {
+                grandTotal += item.total;
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50 transition border-b border-gray-100 last:border-0 group">
+                        <td class="p-3 text-gray-900 font-medium">${item.clave}</td>
+                        <td class="p-3 text-gray-700 max-w-xs truncate" title="${item.name}">${item.name}</td>
+                        <td class="p-3 text-gray-700 text-right">$${item.unitPrice.toFixed(2)}</td>
+                        <td class="p-3 text-gray-700 text-center">
+                            <input type="number" min="1" value="${item.qty}" onchange="updateCalcItemQty(${index}, this.value)" class="w-16 px-2 py-1 border border-gray-200 rounded text-center focus:outline-none focus:border-blue-500">
+                        </td>
+                        <td class="p-3 font-semibold text-gray-900 text-right flex justify-end items-center gap-4">
+                            $${item.total.toFixed(2)}
+                            <button onclick="removeCalcItem(${index})" class="text-gray-300 hover:text-red-500 transition opacity-0 group-hover:opacity-100">×</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            summary.innerText = "$" + grandTotal.toFixed(2);
+            const dateStr = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            document.getElementById('calc-date').innerText = "Generado: " + dateStr;
+        }
+
+        function updateCalcItemQty(index, newQty) {
+            const qty = parseInt(newQty);
+            if (isNaN(qty) || qty <= 0) return;
+            calcItems[index].qty = qty;
+            calcItems[index].total = parseFloat((calcItems[index].unitPrice * qty).toFixed(2));
+            renderCalcTable();
+        }
+
+        function removeCalcItem(index) {
+            calcItems.splice(index, 1);
+            renderCalcTable();
+        }
+
+        function generateCalcXLSX() {
+            if (calcItems.length === 0) {
+                alert("No hay productos en la lista para exportar.");
+                return;
+            }
+
+            const btn = document.querySelector('button[onclick="generateCalcXLSX()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ Generando...';
+            btn.disabled = true;
+
+            const headers = ["Clave", "Nombre", "Precio Unitario", "Cajas", "Total"];
+            const data = calcItems.map(item => [item.clave, item.name, item.unitPrice, item.qty, item.total]);
+            const grandTotal = calcItems.reduce((sum, item) => sum + item.total, 0);
+            data.push([]);
+            data.push(["", "", "", "Gran Total:", grandTotal]);
+
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+            const ws_range = XLSX.utils.decode_range(ws['!ref']);
+            for (let C = ws_range.s.c; C <= ws_range.e.c; ++C) {
+                const header_cell_address = XLSX.utils.encode_cell({r: 0, c: C});
+                if(ws[header_cell_address]) {
+                    ws[header_cell_address].s = { font: { bold: true }, fill: { fgColor: { rgb: "FFFDE7" } } };
+                }
+            }
+            const totalRow = data.length;
+            if (ws['E' + (totalRow + 1)]) ws['E' + (totalRow + 1)].s = { font: { bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "right" } };
+            if (ws['D' + (totalRow + 1)]) ws['D' + (totalRow + 1)].s = { font: { bold: true }, alignment: { horizontal: "right" } };
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Listado de Costos");
+
+            try {
+                XLSX.writeFile(wb, "Listado_Costos_PCZ.xlsx");
+            } catch (err) {
+                console.error("XLSX generation error", err);
+                alert("Hubo un error al generar el archivo XLSX.");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // --- DASHBOARD ---
+        let categoryChartInstance = null;
+        let brandChartInstance = null;
+
+        function updateDashboard() {
+            const total = products.length;
+            const categories = [...new Set(products.map(p => p.category))];
+            const brands = [...new Set(products.map(p => p.brand).filter(Boolean))];
+
+            document.getElementById('kpi-total').innerText = total;
+            document.getElementById('kpi-categories').innerText = categories.length;
+            document.getElementById('kpi-brands').innerText = brands.length;
+
+            const catCounts = {};
+            products.forEach(p => catCounts[p.category] = (catCounts[p.category] || 0) + 1);
+
+            const brandCounts = {};
+            products.forEach(p => {
+                if (p.brand && p.brand !== 'Generica') brandCounts[p.brand] = (brandCounts[p.brand] || 0) + 1;
+            });
+            const sortedBrands = Object.entries(brandCounts).sort((a,b) => b[1] - a[1]).slice(0, 10);
+
+            renderCategoryChart(catCounts);
+            renderBrandChart(sortedBrands);
+        }
+
+        function renderCategoryChart(data) {
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            if (categoryChartInstance) categoryChartInstance.destroy();
+            categoryChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(data).map(k => k.replace(/_/g, ' ').toUpperCase()),
+                    datasets: [{ data: Object.values(data), backgroundColor: ['#2563EB', '#3B82F6', '#60A5FA', '#93C5FD', '#BFDBFE', '#1E40AF', '#7C3AED', '#F59E0B'], borderWidth: 0 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+            });
+        }
+
+        function renderBrandChart(sortedData) {
+            const ctx = document.getElementById('brandChart').getContext('2d');
+            if (brandChartInstance) brandChartInstance.destroy();
+            brandChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedData.map(i => i[0]),
+                    datasets: [{ label: 'Productos', data: sortedData.map(i => i[1]), backgroundColor: '#10B981', borderRadius: 4 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+            });
+        }
+
+        // --- CATALOG ---
+        function initFilters() {
+            const container = document.getElementById('categoryFilters');
+            const cats = ['todos', 'pest_control', 'home_cleaning', 'air_care', 'home_storage', 'npds', 'nuevos_productos', 'special packs'];
+            container.innerHTML = cats.map(cat => {
+                const label = cat === 'todos' ? 'Todos' : cat.replace(/_/g, ' ').toUpperCase();
+                return `<button onclick="filterProducts('${cat}')" class="filter-btn px-4 py-2 rounded-full text-sm font-semibold border border-gray-200 bg-white text-gray-600 hover:bg-blue-50 hover:border-blue-300 transition" data-cat="${cat}">${label}</button>`;
+            }).join('');
+            filterProducts('todos');
+        }
+
+        function filterProducts(category) {
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.className = "filter-btn px-4 py-2 rounded-full text-sm font-semibold border border-gray-200 bg-white text-gray-600 hover:bg-blue-50 hover:border-blue-300 transition";
+                if(btn.dataset.cat === category) {
+                    btn.classList.add('bg-blue-600', 'text-white', 'border-blue-600', 'hover:bg-blue-700');
+                    btn.classList.remove('bg-white', 'text-gray-600', 'hover:bg-blue-50');
+                }
+            });
+
+            const subFilters = document.getElementById('subFilters');
+            const brandContainer = document.getElementById('brandButtons');
+            brandContainer.innerHTML = '';
+
+            let brandsToShow = [];
+            if (category === 'pest_control') brandsToShow = ['Raid', 'Baygon', 'Off', 'Raidolito', 'Laminitas', 'Aparatos'];
+            else if (category === 'home_cleaning') brandsToShow = ['Pato', 'Pledge', 'Family Guard', 'Drano', 'Windex', 'Mr. Musculo'];
+            else if (category === 'air_care') brandsToShow = ['Glade'];
+            else if (category === 'home_storage') brandsToShow = ['Ziploc'];
+            else if (category === 'special packs') brandsToShow = ['special packs'];
+
+            if (brandsToShow.length > 0) {
+                subFilters.classList.remove('hidden');
+                subFilters.classList.add('flex');
+                brandContainer.innerHTML = brandsToShow.map(b =>
+                    `<button onclick="filterByBrand('${b}', '${category}')" class="brand-btn px-3 py-1 rounded-full text-xs border border-gray-300 bg-white text-gray-600 hover:border-blue-500 hover:text-blue-600 transition">${b}</button>`
+                ).join('');
+            } else {
+                subFilters.classList.add('hidden');
+                subFilters.classList.remove('flex');
+            }
+
+            const filtered = category === 'todos' ? products : products.filter(p => p.category === category);
+            renderProducts(filtered);
+        }
+
+        function filterByBrand(brand, category) {
+            document.querySelectorAll('.brand-btn').forEach(btn => {
+                btn.className = "brand-btn px-3 py-1 rounded-full text-xs border border-gray-300 bg-white text-gray-600 hover:border-blue-500 hover:text-blue-600 transition";
+                if(btn.innerText === brand) btn.className = "brand-btn px-3 py-1 rounded-full text-xs border border-blue-600 bg-blue-50 text-blue-700 font-bold shadow-sm transition";
+            });
+            const filtered = products.filter(p => p.category === category && p.brand.toLowerCase().includes(brand.toLowerCase()));
+            renderProducts(filtered);
+        }
+
+        function renderProducts(list) {
+            const grid = document.getElementById('productGrid');
+            const count = document.getElementById('productCount');
+            grid.innerHTML = '';
+            count.innerText = list.length;
+
+            list.forEach(p => {
+                let imgUrl = p.image;
+                if (!imgUrl || imgUrl === "") {
+                    imgUrl = "https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image";
+                } else {
+                    imgUrl = formatImageUrl(imgUrl);
+                }
+
+                const card = `
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition cursor-pointer group flex flex-col overflow-hidden" onclick="openProductDetails(${p.id})">
+                        <div class="h-48 overflow-hidden bg-gray-50 relative">
+                            <img src="${imgUrl}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-500" onerror="this.src='https://via.placeholder.com/400?text=Error'">
+                            <span class="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider text-blue-600 shadow-sm border border-blue-100">${(p.category || '').replace('_', ' ')}</span>
+                        </div>
+                        <div class="p-4 flex flex-col flex-grow">
+                            <div class="text-xs text-gray-400 font-semibold mb-1 uppercase">${p.brand || ''}</div>
+                            <h3 class="font-bold text-gray-900 mb-2 leading-snug group-hover:text-blue-600 transition">${p.name}</h3>
+                            <div class="mt-auto flex items-center justify-between pt-3 border-t border-gray-50">
+                                <span class="text-xs text-blue-500 font-medium hover:underline">Ver ficha técnica</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                grid.innerHTML += card;
+            });
+        }
+
+        // --- UTILS ---
+        function formatImageUrl(url) {
+            let finalUrl = url;
+            if (url && url.includes('drive.google.com') && url.includes('/file/d/')) {
+                const idMatch = url.match(/\/d\/(.*?)\//);
+                if (idMatch && idMatch[1]) finalUrl = `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
+            } else if (url && url.includes('dropbox.com')) {
+                finalUrl = url.replace('dl=0', 'raw=1');
+            }
+            if (finalUrl && finalUrl.startsWith('http')) {
+                return `https://wsrv.nl/?url=${encodeURIComponent(finalUrl)}&w=300&q=50`;
+            }
+            return finalUrl;
+        }
+
+        // --- MODALS ---
+        function openProductDetails(id) {
+            const p = products.find(i => i.id === id);
+            if(!p) return;
+            document.getElementById('modalTitle').innerText = p.name;
+            document.getElementById('modalCategoryBadge').innerText = (p.category || '').replace('_',' ');
+
+            let imgUrl = p.image || "https://via.placeholder.com/400?text=No+Image";
+            if (imgUrl.startsWith('http')) imgUrl = formatImageUrl(imgUrl);
+            document.getElementById('modalImg').src = imgUrl;
+
+            // Description
+            const descEl = document.getElementById('modalDescription');
+            if (p.description) {
+                descEl.innerText = p.description;
+                descEl.classList.remove('hidden');
+            } else {
+                descEl.classList.add('hidden');
+            }
+
+            // Specs from structured fields
+            const specs = document.getElementById('modalSpecs');
+            specs.innerHTML = '';
+            const specItems = [
+                { label: 'Clave Z', value: p.clave_z },
+                { label: 'Clave SCJ', value: p.clave_scj },
+                { label: 'UPC', value: p.upc },
+                { label: 'Precio', value: p.price ? '$' + p.price.toFixed(2) : '' }
+            ];
+            specItems.forEach(s => {
+                if (s.value) {
+                    specs.innerHTML += `<li class="flex items-start gap-2"><span class="text-blue-400 mt-1">▪</span> <strong>${s.label}:</strong> ${s.value}</li>`;
+                }
+            });
+            if (!specs.innerHTML) {
+                specs.innerHTML = '<li class="text-gray-400 italic">No hay datos disponibles.</li>';
+            }
+
+            document.getElementById('productModal').classList.remove('hidden');
+        }
+
+        function closeProductModal() { document.getElementById('productModal').classList.add('hidden'); }
+
+        // Search
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            if (term === '') {
+                filterProducts('todos');
+                return;
+            }
+            const matches = products.filter(p =>
+                p.name.toLowerCase().includes(term) ||
+                (p.clave_z && p.clave_z.toLowerCase().includes(term)) ||
+                (p.clave_scj && p.clave_scj.toLowerCase().includes(term)) ||
+                (p.upc && p.upc.toLowerCase().includes(term))
+            );
+            renderProducts(matches);
+        });
+
+        // Start
+        init();
+    </script>
+</body>
+</html>
