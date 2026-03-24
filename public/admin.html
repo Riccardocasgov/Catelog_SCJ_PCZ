@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Catálogo PCZ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="text-gray-800 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">🔧</span>
+                    <span class="text-2xl font-bold text-gray-800">Panel de <span class="text-blue-600">Administración</span></span>
+                </div>
+                <div id="header-actions" class="flex items-center gap-4 hidden">
+                    <a href="/" class="text-sm text-gray-500 hover:text-blue-600 transition">Ver Catálogo</a>
+                    <span id="admin-username" class="text-sm text-gray-500"></span>
+                    <button onclick="logout()" class="px-4 py-1.5 text-sm font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition">Cerrar Sesión</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- LOGIN -->
+        <section id="login-section" class="flex items-center justify-center min-h-[60vh]">
+            <div class="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 w-full max-w-md">
+                <h2 class="text-2xl font-bold text-gray-900 mb-2 text-center">Iniciar Sesión</h2>
+                <p class="text-gray-500 text-sm text-center mb-6">Acceso restringido a administradores</p>
+                <div id="login-error" class="hidden bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4"></div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Usuario</label>
+                        <input type="text" id="login-user" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="admin">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                        <input type="password" id="login-pass" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••••"
+                            onkeydown="if(event.key==='Enter')doLogin()">
+                    </div>
+                    <button onclick="doLogin()" id="login-btn" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition">
+                        Entrar
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ADMIN PANEL -->
+        <section id="admin-section" class="hidden fade-in space-y-6">
+            <!-- Toolbar -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">Gestión de Productos</h1>
+                    <p class="text-sm text-gray-500">Total: <strong id="admin-count">0</strong> productos</p>
+                </div>
+                <div class="flex gap-3">
+                    <input type="text" id="admin-search" placeholder="Buscar..." class="px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" oninput="filterAdminTable()">
+                    <button onclick="openForm()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition text-sm">
+                        + Nuevo Producto
+                    </button>
+                </div>
+            </div>
+
+            <!-- Products Table -->
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500">
+                                <th class="p-3">ID</th>
+                                <th class="p-3">Imagen</th>
+                                <th class="p-3">Nombre</th>
+                                <th class="p-3">Categoría</th>
+                                <th class="p-3">Marca</th>
+                                <th class="p-3">Clave Z</th>
+                                <th class="p-3">Clave SCJ</th>
+                                <th class="p-3">UPC</th>
+                                <th class="p-3 text-right">Precio</th>
+                                <th class="p-3 text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-table-body" class="text-sm divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- PRODUCT FORM MODAL -->
+    <div id="formModal" class="fixed inset-0 bg-black/50 z-[90] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+                <h3 id="form-title" class="text-xl font-bold text-gray-900">Nuevo Producto</h3>
+                <button onclick="closeForm()" class="text-gray-400 hover:text-red-500 text-2xl leading-none">×</button>
+            </div>
+            <div class="p-6 space-y-4">
+                <input type="hidden" id="form-id">
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                    <input type="text" id="form-name" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nombre del producto">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                    <textarea id="form-description" rows="3" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Descripción detallada del producto..."></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+                        <select id="form-category" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                            <option value="">Seleccionar...</option>
+                            <option value="pest_control">Control de Plagas</option>
+                            <option value="home_cleaning">Limpieza del Hogar</option>
+                            <option value="air_care">Ambientadores</option>
+                            <option value="home_storage">Almacenamiento</option>
+                            <option value="npds">NPDs</option>
+                            <option value="nuevos_productos">Nuevos Productos</option>
+                            <option value="special packs">Special Packs</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Marca</label>
+                        <input type="text" id="form-brand" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: Raid, Glade...">
+                    </div>
+                </div>
+
+                <!-- Image -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Imagen</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="form-image" class="flex-grow px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="URL de la imagen o suba un archivo">
+                        <label class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg cursor-pointer transition text-sm font-medium flex items-center">
+                            Subir
+                            <input type="file" id="form-image-file" accept="image/*" class="hidden" onchange="uploadImage(this)">
+                        </label>
+                    </div>
+                    <div id="image-preview" class="mt-2 hidden">
+                        <img id="preview-img" class="h-24 rounded-lg border border-gray-200 object-cover">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Clave Z</label>
+                        <input type="text" id="form-clave-z" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Alfanumérico">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Clave SCJ</label>
+                        <input type="text" id="form-clave-scj" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Alfanumérico">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">UPC</label>
+                        <input type="text" id="form-upc" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Código de barras">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Precio (MXN)</label>
+                    <input type="number" step="0.01" id="form-price" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0.00">
+                </div>
+
+                <div id="form-error" class="hidden bg-red-50 text-red-600 text-sm p-3 rounded-lg"></div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                    <button onclick="closeForm()" class="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition">Cancelar</button>
+                    <button onclick="saveProduct()" id="form-save-btn" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DELETE CONFIRM MODAL -->
+    <div id="deleteModal" class="fixed inset-0 bg-black/50 z-[95] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl max-w-sm w-full shadow-2xl p-6">
+            <h3 class="text-lg font-bold text-gray-900 mb-2">Confirmar Eliminación</h3>
+            <p class="text-sm text-gray-600 mb-4">¿Está seguro de eliminar <strong id="delete-product-name"></strong>? Esta acción no se puede deshacer.</p>
+            <input type="hidden" id="delete-product-id">
+            <div class="flex justify-end gap-3">
+                <button onclick="closeDeleteModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition">Cancelar</button>
+                <button onclick="confirmDelete()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allProducts = [];
+
+        // --- AUTH ---
+        async function checkAuth() {
+            const res = await fetch('/admin/check');
+            const data = await res.json();
+            if (data.authenticated) {
+                showAdminPanel(data.username);
+            }
+        }
+
+        async function doLogin() {
+            const username = document.getElementById('login-user').value.trim();
+            const password = document.getElementById('login-pass').value;
+            const errEl = document.getElementById('login-error');
+            errEl.classList.add('hidden');
+
+            if (!username || !password) {
+                errEl.innerText = 'Complete todos los campos.';
+                errEl.classList.remove('hidden');
+                return;
+            }
+
+            const btn = document.getElementById('login-btn');
+            btn.disabled = true;
+            btn.innerText = 'Verificando...';
+
+            const res = await fetch('/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+
+            if (res.ok) {
+                showAdminPanel(data.username);
+            } else {
+                errEl.innerText = data.error || 'Error de autenticación';
+                errEl.classList.remove('hidden');
+            }
+            btn.disabled = false;
+            btn.innerText = 'Entrar';
+        }
+
+        async function logout() {
+            await fetch('/admin/logout', { method: 'POST' });
+            location.reload();
+        }
+
+        function showAdminPanel(username) {
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('admin-section').classList.remove('hidden');
+            document.getElementById('header-actions').classList.remove('hidden');
+            document.getElementById('admin-username').innerText = username;
+            loadProducts();
+        }
+
+        // --- PRODUCTS ---
+        async function loadProducts() {
+            const res = await fetch('/api/products');
+            allProducts = await res.json();
+            renderAdminTable(allProducts);
+        }
+
+        function filterAdminTable() {
+            const term = document.getElementById('admin-search').value.toLowerCase();
+            if (!term) return renderAdminTable(allProducts);
+            const filtered = allProducts.filter(p =>
+                p.name.toLowerCase().includes(term) ||
+                (p.clave_z || '').toLowerCase().includes(term) ||
+                (p.clave_scj || '').toLowerCase().includes(term) ||
+                (p.upc || '').toLowerCase().includes(term) ||
+                (p.brand || '').toLowerCase().includes(term)
+            );
+            renderAdminTable(filtered);
+        }
+
+        function renderAdminTable(products) {
+            const tbody = document.getElementById('admin-table-body');
+            document.getElementById('admin-count').innerText = allProducts.length;
+
+            if (products.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="p-6 text-center text-gray-400 italic">No hay productos.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = products.map(p => `
+                <tr class="hover:bg-gray-50 transition">
+                    <td class="p-3 text-gray-500 text-xs">${p.id}</td>
+                    <td class="p-3">
+                        ${p.image ? `<img src="${formatThumb(p.image)}" class="h-10 w-10 rounded object-cover border border-gray-200" onerror="this.style.display='none'">` : '<span class="text-gray-300 text-xs">--</span>'}
+                    </td>
+                    <td class="p-3 font-medium text-gray-900 max-w-[200px] truncate" title="${p.name}">${p.name}</td>
+                    <td class="p-3 text-xs text-gray-500">${(p.category || '').replace(/_/g, ' ')}</td>
+                    <td class="p-3 text-xs text-gray-500">${p.brand || '--'}</td>
+                    <td class="p-3 text-xs font-mono">${p.clave_z || '--'}</td>
+                    <td class="p-3 text-xs font-mono">${p.clave_scj || '--'}</td>
+                    <td class="p-3 text-xs font-mono">${p.upc || '--'}</td>
+                    <td class="p-3 text-right text-sm font-medium">${p.price ? '$' + p.price.toFixed(2) : '--'}</td>
+                    <td class="p-3 text-center">
+                        <div class="flex justify-center gap-2">
+                            <button onclick="editProduct(${p.id})" class="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition">Editar</button>
+                            <button onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" class="px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded transition">Eliminar</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function formatThumb(url) {
+            if (!url) return '';
+            if (url.startsWith('/uploads/')) return url;
+            if (url.includes('dropbox.com')) url = url.replace('dl=0', 'raw=1');
+            return `https://wsrv.nl/?url=${encodeURIComponent(url)}&w=80&q=40`;
+        }
+
+        // --- FORM ---
+        function openForm(productId) {
+            document.getElementById('form-id').value = '';
+            document.getElementById('form-name').value = '';
+            document.getElementById('form-description').value = '';
+            document.getElementById('form-category').value = '';
+            document.getElementById('form-brand').value = '';
+            document.getElementById('form-image').value = '';
+            document.getElementById('form-clave-z').value = '';
+            document.getElementById('form-clave-scj').value = '';
+            document.getElementById('form-upc').value = '';
+            document.getElementById('form-price').value = '';
+            document.getElementById('form-error').classList.add('hidden');
+            document.getElementById('image-preview').classList.add('hidden');
+            document.getElementById('form-title').innerText = 'Nuevo Producto';
+            document.getElementById('formModal').classList.remove('hidden');
+        }
+
+        function editProduct(id) {
+            const p = allProducts.find(x => x.id === id);
+            if (!p) return;
+            document.getElementById('form-id').value = p.id;
+            document.getElementById('form-name').value = p.name || '';
+            document.getElementById('form-description').value = p.description || '';
+            document.getElementById('form-category').value = p.category || '';
+            document.getElementById('form-brand').value = p.brand || '';
+            document.getElementById('form-image').value = p.image || '';
+            document.getElementById('form-clave-z').value = p.clave_z || '';
+            document.getElementById('form-clave-scj').value = p.clave_scj || '';
+            document.getElementById('form-upc').value = p.upc || '';
+            document.getElementById('form-price').value = p.price || '';
+            document.getElementById('form-error').classList.add('hidden');
+            document.getElementById('form-title').innerText = 'Editar Producto';
+
+            // Show image preview if exists
+            if (p.image) {
+                document.getElementById('preview-img').src = formatThumb(p.image);
+                document.getElementById('image-preview').classList.remove('hidden');
+            } else {
+                document.getElementById('image-preview').classList.add('hidden');
+            }
+
+            document.getElementById('formModal').classList.remove('hidden');
+        }
+
+        function closeForm() {
+            document.getElementById('formModal').classList.add('hidden');
+        }
+
+        async function uploadImage(input) {
+            if (!input.files || !input.files[0]) return;
+            const formData = new FormData();
+            formData.append('image', input.files[0]);
+
+            const res = await fetch('/admin/upload', { method: 'POST', body: formData });
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('form-image').value = data.url;
+                document.getElementById('preview-img').src = data.url;
+                document.getElementById('image-preview').classList.remove('hidden');
+            } else {
+                alert('Error al subir la imagen.');
+            }
+            input.value = '';
+        }
+
+        async function saveProduct() {
+            const id = document.getElementById('form-id').value;
+            const body = {
+                name: document.getElementById('form-name').value.trim(),
+                description: document.getElementById('form-description').value.trim(),
+                category: document.getElementById('form-category').value,
+                brand: document.getElementById('form-brand').value.trim(),
+                image: document.getElementById('form-image').value.trim(),
+                clave_z: document.getElementById('form-clave-z').value.trim(),
+                clave_scj: document.getElementById('form-clave-scj').value.trim(),
+                upc: document.getElementById('form-upc').value.trim(),
+                price: document.getElementById('form-price').value
+            };
+
+            const errEl = document.getElementById('form-error');
+            if (!body.name) {
+                errEl.innerText = 'El nombre es requerido.';
+                errEl.classList.remove('hidden');
+                return;
+            }
+
+            const btn = document.getElementById('form-save-btn');
+            btn.disabled = true;
+            btn.innerText = 'Guardando...';
+
+            const url = id ? `/admin/products/${id}` : '/admin/products';
+            const method = id ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            if (res.ok) {
+                closeForm();
+                await loadProducts();
+            } else {
+                const data = await res.json();
+                errEl.innerText = data.error || 'Error al guardar.';
+                errEl.classList.remove('hidden');
+            }
+
+            btn.disabled = false;
+            btn.innerText = 'Guardar';
+        }
+
+        // --- DELETE ---
+        function deleteProduct(id, name) {
+            document.getElementById('delete-product-id').value = id;
+            document.getElementById('delete-product-name').innerText = name;
+            document.getElementById('deleteModal').classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.add('hidden');
+        }
+
+        async function confirmDelete() {
+            const id = document.getElementById('delete-product-id').value;
+            const res = await fetch(`/admin/products/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                closeDeleteModal();
+                await loadProducts();
+            } else {
+                alert('Error al eliminar el producto.');
+            }
+        }
+
+        // --- INIT ---
+        checkAuth();
+    </script>
+</body>
+</html>
