@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo PCZ - Dashboard Interactivo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
+        /* Chart Container Styling as per requirements */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container { height: 350px; }
+        }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .nav-active { border-bottom: 2px solid #2563EB; color: #2563EB; }
+    </style>
+    <!-- Chosen Palette: Blue Professional (Tailwind Blue-600 focus) -->
+    <!-- Application Structure Plan:
+         1. Dashboard View: Provides a high-level overview of the catalog inventory using data visualization (Charts) to understand category and brand distribution. This answers "What do we have?".
+         2. Catalog View: The core exploration tool. Allows detailed filtering, searching, and product inspection. This answers "Where is specific item X?".
+         3. Navigation: Simple tab-based switching for a seamless SPA experience without page reloads.
+         Reasoning: Separating the 'Analysis' (Dashboard) from the 'List' (Catalog) avoids clutter and provides value to both managers (stats) and buyers (search).
+    -->
+</head>
+<body class="text-gray-800 flex flex-col min-h-screen">
+
+    <!-- Header & Navigation -->
+    <header class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl">📦</span>
+                    <span class="text-2xl font-bold text-blue-600">Catálogo <span class="text-gray-800">PCZ</span></span>
+                </div>
+                <nav class="flex gap-6">
+                    <button onclick="switchView('dashboard')" id="nav-dashboard" class="px-3 py-2 font-medium text-gray-500 hover:text-blue-600 transition nav-active">Dashboard</button>
+                    <button onclick="switchView('catalog')" id="nav-catalog" class="px-3 py-2 font-medium text-gray-500 hover:text-blue-600 transition">Explorar Productos</button>
+                    <button onclick="switchView('calculator')" id="nav-calculator" class="px-3 py-2 font-medium text-gray-500 hover:text-blue-600 transition">Calculadora de Costos</button>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- VIEW 1: DASHBOARD (Resumen Ejecutivo) -->
+        <section id="view-dashboard" class="fade-in space-y-8">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                <h1 class="text-3xl font-bold text-gray-900 mb-2">Resumen de Inventario</h1>
+                <p class="text-gray-600">Visualización estratégica del portafolio de productos. Analice la distribución por categorías y la presencia de marcas clave.</p>
+
+                <!-- KPIs -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                        <div class="text-blue-600 text-sm font-bold uppercase">Total SKUs</div>
+                        <div class="text-3xl font-bold text-gray-900" id="kpi-total">0</div>
+                    </div>
+                    <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                        <div class="text-indigo-600 text-sm font-bold uppercase">Categorías</div>
+                        <div class="text-3xl font-bold text-gray-900" id="kpi-categories">0</div>
+                    </div>
+                    <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                        <div class="text-emerald-600 text-sm font-bold uppercase">Marcas Activas</div>
+                        <div class="text-3xl font-bold text-gray-900" id="kpi-brands">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Category Distribution -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Distribución por Categoría</h3>
+                    <p class="text-sm text-gray-500 mb-4">Proporción de productos asignados a cada segmento de negocio.</p>
+                    <div class="flex-grow flex items-center justify-center">
+                        <div class="chart-container">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Brand Analysis -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+                    <h3 class="text-lg font-bold text-gray-900 mb-4">Top Marcas por Volumen</h3>
+                    <p class="text-sm text-gray-500 mb-4">Cantidad de SKUs disponibles por marca principal.</p>
+                    <div class="flex-grow flex items-center justify-center">
+                        <div class="chart-container">
+                            <canvas id="brandChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VIEW 2: CATALOG (Exploración Detallada) -->
+        <section id="view-catalog" class="hidden fade-in">
+            <div class="mb-8 text-center">
+                <h2 class="text-3xl font-bold text-gray-900 mb-2">Explorador de Productos</h2>
+                <p class="text-gray-600 mb-6">Utilice los filtros y la búsqueda inteligente para localizar artículos específicos por nombre, código o características.</p>
+
+                <!-- Search Bar -->
+                <div class="relative w-full max-w-2xl mx-auto mb-6">
+                    <input type="text" id="searchInput" placeholder="🔍 Buscar por Nombre, Clave Z, SCJ, UPC..."
+                        class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm transition">
+                    <span class="absolute left-3 top-3.5 text-gray-400"></span>
+                </div>
+
+                <!-- Main Filters -->
+                <div class="flex flex-wrap items-center gap-2 justify-center mb-4" id="categoryFilters">
+                    <!-- Dynamic buttons injected via JS -->
+                </div>
+
+                <!-- Sub Filters (Brands) -->
+                <div id="subFilters" class="hidden animate-fade-in bg-white p-3 rounded-xl border border-gray-200 max-w-4xl mx-auto flex flex-wrap items-center justify-center gap-2 shadow-sm">
+                    <span class="text-xs font-bold text-gray-400 uppercase tracking-wide mr-2">Filtrar Marca:</span>
+                    <div id="brandButtons" class="flex flex-wrap justify-center gap-2"></div>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center mb-4 px-2">
+                <span class="text-sm text-gray-500">Resultados: <strong id="productCount" class="text-gray-900">0</strong></span>
+            </div>
+
+            <!-- Product Grid -->
+            <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <!-- Cards injected via JS -->
+            </div>
+        </section>
+
+        <!-- VIEW 3: CALCULATOR (Calculadora de Costos) -->
+        <section id="view-calculator" class="hidden fade-in space-y-8">
+            <div class="mb-8 text-center">
+                <h2 class="text-3xl font-bold text-gray-900 mb-2">Calculadora de Costos</h2>
+                <p class="text-gray-600 mb-6">Ingrese la clave del producto y la cantidad de cajas para generar un listado de costos.</p>
+
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 max-w-3xl mx-auto flex flex-col md:flex-row gap-4 items-end">
+                    <div class="flex-grow w-full">
+                        <label class="block text-sm font-medium text-gray-700 text-left mb-1">Clave del Producto (Z, SCJ o UPC)</label>
+                        <input type="text" id="calc-clave" placeholder="Ej: 320001" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div class="w-full md:w-1/3">
+                        <label class="block text-sm font-medium text-gray-700 text-left mb-1">Cantidad de Cajas</label>
+                        <input type="number" id="calc-qty" min="1" value="1" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <button onclick="addCalcItem()" class="w-full md:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition">Agregar</button>
+                </div>
+            </div>
+
+            <!-- List Output for PDF generation -->
+            <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-5xl mx-auto" id="calc-export-area">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-gray-900">Listado de Productos</h3>
+                    <div class="text-sm text-gray-500" id="calc-date"></div>
+                </div>
+
+                <div class="overflow-x-auto w-full">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200 text-sm">
+                                <th class="p-3 font-semibold text-gray-700 rounded-tl-lg">Clave</th>
+                                <th class="p-3 font-semibold text-gray-700">Nombre</th>
+                                <th class="p-3 font-semibold text-gray-700 text-right">Precio Unitario</th>
+                                <th class="p-3 font-semibold text-gray-700 text-center">Cajas</th>
+                                <th class="p-3 font-semibold text-gray-700 text-right rounded-tr-lg">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="calc-table-body" class="text-sm text-gray-600 divide-y divide-gray-100">
+                            <tr><td colspan="5" class="p-4 text-center text-gray-400 italic">No hay productos ingresados.</td></tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="bg-blue-50 border-t border-blue-100">
+                                <td colspan="4" class="p-3 text-right font-bold text-gray-800">Gran Total:</td>
+                                <td class="p-3 font-bold text-blue-700 text-lg text-right" id="calc-total-summary">$0.00</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <div class="flex justify-center mt-4">
+                <button onclick="generateCalcXLSX()" class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-full shadow-lg transition flex items-center gap-2">
+                    📄 Generar Excel
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal Details -->
+    <div id="productModal" class="fixed inset-0 bg-black/50 z-[90] hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden flex flex-col md:flex-row max-h-[90vh]">
+            <div class="relative w-full md:w-1/2 h-64 md:h-auto bg-gray-100 flex items-center justify-center">
+                <img id="modalImg" class="max-w-full max-h-full object-contain p-4" alt="Product Image">
+                <span id="modalCategoryBadge" class="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-blue-600 shadow-sm"></span>
+            </div>
+            <div class="w-full md:w-1/2 p-8 flex flex-col bg-white overflow-y-auto">
+                <div class="flex justify-between items-start mb-4">
+                    <h3 id="modalTitle" class="text-2xl font-bold text-gray-900 leading-tight"></h3>
+                    <button onclick="closeProductModal()" class="text-gray-400 hover:text-red-500 text-2xl leading-none">×</button>
+                </div>
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-6">
+                    <h4 class="font-bold text-gray-800 mb-3 flex items-center gap-2 text-sm uppercase tracking-wide">
+                        📋 Ficha Técnica
+                    </h4>
+                    <ul id="modalSpecs" class="space-y-2 text-sm text-gray-700"></ul>
+                </div>
+                <div class="mt-auto pt-4 border-t border-gray-100 flex justify-end">
+                    <button onclick="closeProductModal()" class="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-gray-200 mt-auto py-6">
+        <div class="max-w-7xl mx-auto px-4 text-center md:text-left flex flex-col md:flex-row justify-between items-center text-xs text-gray-500">
+            <p>&copy; <span id="currentYear"></span> Catálogo PCZ. Uso interno.</p>
+            <p>Última actualización: <span id="lastUpdateDisplay" class="font-semibold text-gray-700"></span></p>
+        </div>
+    </footer>
+
+    <script>
+        // CONFIG
+        const appConfig = { lastUpdate: "9 de Marzo de 2026" };
+
+        // DATA STORE
+        // Complete list of 124 products as per previous context
+        const generateProducts = () => {
+            return [
+                // Existing Products (1-11)
+                { id: 1, name: "RAID CASA Y JARDIN 400ml /12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/2visbe2f6k5rueo2ryapu/7501032925956.jpg?rlkey=cgyrqt7eom5x8lxexf1fxjj5p&st=4r6tigkx&raw=1", specs: ["Clave Z: 320001", "Clave SCJ: 313689", "UPC: 7501032925956"] , price: 775.7 },
+                { id: 2, name: "RAID CASA Y JARDIN NARANJA 400ml /12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/4i5neksq98fct3dxume7q/7501032913809.jpg?rlkey=4yerh7k9o729bsccihaqwnezd&st=fowhc313&raw=1", specs: ["Clave Z: 320267", "Clave SCJ: 313697", "UPC: 7501032913809"] , price: 852.0 },
+                { id: 3, name: "RAID CASA Y JARDIN 285ml /12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/na3wqc4nn47iixe5md3qs/7501032920418.jpg?rlkey=29i9mbbwsra1l5via2dslggaz&st=1ddfn4ww&raw=1", specs: ["Clave Z: 320284", "Clave SCJ: 313708", "UPC: 7501032920401"] , price: 620.1 }, // Generic placeholder kept
+                { id: 4, name: "RAID CASA Y JARDIN NARANJA 285ml /12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/na3wqc4nn47iixe5md3qs/7501032920418.jpg?rlkey=29i9mbbwsra1l5via2dslggaz&st=dprnwlhk&raw=1", specs: ["Clave Z320339: ", "Clave SCJ 374605: ", "UPC 7501032900540: "] , price: 566.8 }, // Generic placeholder kept
+                { id: 5, name: "RAID CASA Y JARDIN EUCALIPTO 400ml/12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/4i5neksq98fct3dxume7q/7501032913809.jpg?rlkey=4yerh7k9o729bsccihaqwnezd&st=qkftje68&raw=1", specs: ["Clave Z 320227: ", "Clave SCJ 316319: ", "UPC: 7501032906566"] , price:  815.90  },
+                { id: 6, name: "RAID CASA Y JARDIN EUCALIPTO 430ml/12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/ysif4bgadgtzzr4b76j6x/7501032930455.jpg?rlkey=8g03pp89x6w3x8gtfkw4ti20h&st=aior7ryc&raw=1", specs: ["Clave Z: 320345", "Clave SCJ: 313691", "UPC: 7501032930455"] , price: 727.9 },
+                { id: 7, name: "RAID MATABICHOS 400ml/12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/ppxsmpsa7ynyoi6ioegfm/7501032925550.jpg?rlkey=07ex3hwwwoqfxkd1wxcdk95fm&st=qx4gxj90&raw=1", specs: ["Clave Z: 320002", "Clave SCJ: 356100", "UPC: 7501032925550"] , price: 743.2 },
+                { id: 8, name: "RAID MATABICHOS 285/12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/tzq6t3ll59r83b92fy7hh/7501032900540.jpg?rlkey=9szh460b1tb3d6ledppsvsuqu&st=ek69ysd0&raw=1", specs: ["Clave Z: 320339", "Clave SCJ: 374605", "UPC: 7501032900540"] , price: 566.8 },
+                { id: 9, name: "RAID ACCION TOTAL 400ml/12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/sytjhou287f0yu7uy1eqn/7501032925154.jpg?rlkey=61uzk7f0merqf443k1fmb5etk&st=5dc5e83o&raw=1", specs: ["Clave Z: 320044", "Clave SCJ: 326711", "UPC: 7501032925154"] , price: 780.3 },
+                { id: 10, name: "RAID MAX 400ml/12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/nj052nozwi6jm89mnjlxz/7501032903596.jpg?rlkey=q4403mk9m969tq8ewuwosj0lr&st=havry671&raw=1", specs: ["Clave Z: 320172", "Clave SCJ: 386131", "UPC: 7501032903596"] , price: 831.4 },
+                { id: 11, name: "RAID MAX 285ml/12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/qp9gja5encb7ki28z59vd/7501032920425.jpg?rlkey=ymdwp4lynarde1iqgde1l15s4&st=pnxnjyu8&raw=1", specs: ["Clave Z: 320286", "Clave SCJ: 386120", "UPC: 7501032920425"] , price: 634.7 },
+                { id: 12, name: "RAID MAX DOBLE ACCION 500ml/12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/qjd0mz9655rm6s79z4eqq/7501032926304.jpg?rlkey=861ej4ca24jsndner5bmxa1vx&st=8i5mlcm2&raw=1", specs: ["Clave Z: 320299", "Clave SCJ: ", "UPC: 7501032926304"] , price: 777 },
+                { id: 13, name: "RAID MAX EUCALIPTO 400ml/12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/hsxwxgrnz1vi0d6eps3lf/7501032906573.jpg?rlkey=e5akgxvg6ljfjq4zz2n3qxxmi&st=dkihqn1i&raw=1", specs: ["Clave Z: 320226", "Clave SCJ: 366582", "UPC: 7501032906573"] , price: 881.9 },
+                { id: 14, name: "RAID MAX EUCALIPTO 430ML/12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/mqmzuy8k10mt22rakp039/7501032930462.png?rlkey=o8gksr1gz0serniip8h7g0ylf&st=84p1iupi&raw=1", specs: ["Clave Z: 320346", "Clave SCJ: 316366", "UPC: 7501032930462"] , price: 827.0 },
+                { id: 15, name: "RAID MATA HORMIGA Y ARAÑAS 400ML/12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/27jpu5nwdgpyjzxsuhrn8/7501032918866.jpg?rlkey=8zjdai23sb9u997w8fg3euya3&st=ysmcuzl2&raw=1", specs: ["Clave Z: 320295", "Clave SCJ: 313717", "UPC: 7501032918866"] , price: 847.1 },
+                { id: 16, name: "RAID MATA PULGAS 400ML/12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/nwjjln39ym3x6xpatchr3/7501032918880.jpg?rlkey=r87jsjiap3ktjv5sdqvdr4l1t&st=3a9vrjn5&raw=1", specs: ["Clave Z: 320296", "Clave SCJ: 356104", "UPC: 7501032918880"] , price: 847.1 },
+                { id: 17, name: "RAID MATA CHINCHE Y POLILLA 400ML/12", category: "pest_control", brand: "Raid", image: "https://www.dropbox.com/scl/fi/gq71p7uyoiqvd3se8oxi8/7501032918897.jpg?rlkey=044ftea7utxc21jyloj515fyl&st=6b4rclso&raw=1", specs: ["Clave Z: 320297", "Clave SCJ: 347989", "UPC: 7501032918897"] , price: 847.1 },
+                { id: 18, name: "RAID LAMINITAS VITROLERO 12 lams", category: "pest_control", brand: "Laminitas", image: "https://www.dropbox.com/scl/fi/u9fqrodkukh2uxewq56wq/7501032902087.jpg?rlkey=w0lzxyzwt48fg6umvip8jrzq8&st=diiy6vpw&raw=1", specs: ["Clave Z: ", "Clave SCJ: 658991", "UPC: 7501032902087" ] , price: 588.7 },
+                { id: 16, name: "RAID ELECTRICO REPUESTO Econopack 8lams", category: "pest_control", brand: "Laminitas", image: "https://www.dropbox.com/scl/fi/609t3cwdd1p1o8h09jk4s/7501032910235.jpg?rlkey=roix5o59hppctkusids14h76k&st=bpiqie04&raw=1", specs: ["Clave Z: 320241", "Clave SCJ: 661438", "UPC: 7501032910235"] , price: 366.1 },
+                { id: 17, name: "INSECTICIDA RAID LAMINITAS 24/24 UD", category: "pest_control", brand: "Laminitas", image: "https://www.dropbox.com/scl/fi/f1vjcre2khyrv9e35cial/7501032902094.jpg?rlkey=07yrhgm076lbwnoxwapap6k6n&st=awulkrkz&raw=1", specs: ["Clave Z: 320355", "Clave SCJ: 346755", "UPC: 7501032902094"] , price: 714 },
+                { id: 18, name: "RAID LAMINITAS 16 lams", category: "pest_control", brand: "Laminitas", image: "https://www.dropbox.com/scl/fi/zextlk78ivucro9oo0v8h/7501032929770.jpg?rlkey=tiqciqh82diatpfoqiic1vxo6&st=c6mc2ham&raw=1", specs: ["Clave Z: 320276", "Clave SCJ: 309648", "UPC: 7501032929770"] , price: 714 },
+                { id: 19, name: "RAID LIQ ELECT 30 NOCHES APARATO Antimosquitos", category: "pest_control", brand: "Aparatos", image: "https://www.dropbox.com/scl/fi/mnomg3ghmeclcnzaqjpnc/7501032901653.jpg?rlkey=o4s1kc8hf0kjzjwi6iyic4erk&st=6er84vsu&draw=1", specs: ["Clave Z: 320184", "Clave SCJ: 646645", "UPC: 7501032901653"] , price: 928.2 },
+                { id: 20, name: "RAID LIQ ELECT 30 NOCHES APARATO Naranaja", category: "pest_control", brand: "Aparatos", image: "https://www.dropbox.com/scl/fi/13xv5rxpx797v89ms5v1t/7501032913847.jpg?rlkey=h2psbt3xnp24jsynj7be4e9up&st=5lkzrnm4&raw=1", specs: ["Clave Z: 320269", "Clave SCJ: 692138", "UPC: 7501032913847"] , price: 928.2 },
+                { id: 21, name: "RAID LIQ 30 NOCHES REPUESTO", category: "pest_control", brand: "Laminitas", image: "https://www.dropbox.com/scl/fi/5kqqyzhoelo05ztxgpp97/7501032901660.jpg?rlkey=gv6bw1jqghfcb9qkp4m7gzn5e&st=hkufb8v3&raw=1", specs: ["Clave Z: 320185", "Clave SCJ: 356948", "UPC: 7501032901660"] , price: 768.4 },
+                { id: 22, name: "RAID LIQ ELEC 30 NOCHES REPUESTO NARANJA", category: "pest_control", brand: "Aparatos", image: "https://www.dropbox.com/scl/fi/5i7xygfwyqjv2gc5blmvd/7501032913854.png?rlkey=k3w6siq38a6p8r8q1eohc4dot&st=fvap1wjn&raw=1", specs: ["Clave Z: 320270", "Clave SCJ: 692139", "UPC: 7501032913854"] , price: 768.4 },
+                { id: 23, name: "RAIDOLITOS VERDE 10u", category: "pest_control", brand: "Raidolito", image: "https://www.dropbox.com/scl/fi/155du7zmoyn1at7ptce5j/7591005574007.jpg?rlkey=3susxuppy30kj3fdfvnw1rdq0&st=1ha4gpvg&raw=1", specs: ["Clave Z: 320323", "Clave SCJ: 343794", "UPC: 7591005574007"] , price: 878.5 },
+                { id: 24, name: "RAIDOLITOS LAVANDA 10u", category: "pest_control", brand: "Raidolito", image: "https://www.dropbox.com/scl/fi/ampamx3lgngv2dblzgfbo/7591005574014.jpg?rlkey=ymd9vv1obqm6wtn3dkbepirp4&st=5zrq2q5y&raw=1", specs: ["Clave Z: 320324", "Clave SCJ: 343795", "UPC: 7591005574014"] , price: 878.5 },
+                { id: 25, name: "BAYGON CASA Y JARDIN 380ml / 12", category: "pest_control", brand: "Baygon", image: "https://www.dropbox.com/scl/fi/98nh2v0m0mqf1a9te04o3/7501032900618.jpg?rlkey=kugtu948zwfacntuu8bb8sr5l&st=vkrunvpj&raw=1", specs: ["Clave Z: 320352", "Clave SCJ: 389528", "UPC: 7501032900618"] , price: 537.1 },
+                { id: 26, name: "BAYGON CASA Y JARDIN 280ml / 12", category: "pest_control", brand: "Baygon", image: "https://www.dropbox.com/scl/fi/3xlnwjm96sb9thgyh8nb4/7501032920371.jpg?rlkey=3uru2ceebu1lwo539s2hx839t&st=tp86fk90&raw=1", specs: ["Clave Z: 320287", "Clave SCJ: 313649", "UPC: 7501032920371"] , price: 425.6 },
+                { id: 27, name: "BAYGON CASA Y JARDIN 226ml / 12", category: "pest_control", brand: "Baygon", image: "https://www.dropbox.com/scl/fi/8cvo58cy4lsoknppbsig1/7501032923501.jpg?rlkey=wfiuycqdw79mw3cwerjvmo8eo&st=n9dhahhc&raw=1", specs: ["Clave Z: 320293", "Clave SCJ: 313736", "UPC: 7501032923501"] , price: 369.4 },
+                { id: 28, name: "BAYGON ULTRA VERDE 400ml/12", category: "pest_control", brand: "Baygon", image: "https://www.dropbox.com/scl/fi/p9frdtjss7embb9og1xvi/7501032903572.jpg?rlkey=ave0rm42x5um0sdaxgiwsil8c&st=dcoen0z0&raw=1", specs: ["Clave Z: 320171", "Clave SCJ: 313640", "UPC: 7501032903572"] , price: 603.7 },
+                { id: 29, name: "BAYGON ULTRA VERDE 285ml/12", category: "pest_control", brand: "Baygon", image: "https://www.dropbox.com/scl/fi/5f75qk8fgynwfgt3ta7ok/7501032920395.jpg?rlkey=jpaow6r4ir9xht3zeasssom3d&st=el5guykj&raw=1", specs: ["Clave Z: 320288", "Clave SCJ: 313579", "UPC: 7501032920395"] , price: 479.9 },
+                { id: 30, name: "BAYGON PODER MORTAL 400ml/12", category: "pest_control", brand: "Baygon", image: "https://www.dropbox.com/scl/fi/h0jert00pfgij0q1m8bqt/7501032907495.jpg?rlkey=7ikptpew7vxstqjt8ahjt3gap&st=eb8p4dji&raw=1", specs: ["Clave Z: 320135", "Clave SCJ: 313664", "UPC: 7501032907495"] , price: 635.6 },
+                { id: 31, name: "BAYGON PODER MORTAL 226ml/12", category: "pest_control", brand: "Baygon", image: "https://www.dropbox.com/scl/fi/f3c6x7hiij449861363sl/7501032923082.jpg?rlkey=g0wuj5lo2ynutrul1qzkbs96p&st=kwhm5shy&raw=1", specs: ["Clave Z: 320294", "Clave SCJ: 313646", "UPC: 7501032923082"] , price: 363.4 },
+                { id: 32, name: "BAYGON VERDE LIQUIDO 510ml/12", category: "pest_control", brand: "Baygon", image: "https://www.dropbox.com/scl/fi/5b9egy8bn3mebf4drvkjq/7501032917616.jpg?rlkey=qtp1iyedx2qqk99dvw40hy873&st=s6wrnl6b&raw=1", specs: ["Clave Z: 320303", "Clave SCJ: 317398", "UPC: 7501032917616"] , price: 660.2 },
+                { id: 33, name: "BAYGON TOTAL DOMESTICO 400/ml12", category: "pest_control", brand: "Baygon", image: "https://www.dropbox.com/scl/fi/thvhxj41h0x0s3o643smu/7501032905347.jpg?rlkey=yvo2uv9ee3a6o9ykmeajpiv8b&st=hi0b1xvo&raw=1", specs: ["Clave Z: 320205", "Clave SCJ: 313660", "UPC: 7501032905347"] , price: 422.7 },
+                { id: 34, name: "BAYGON HOGAR TOTAL 400ml/12", category: "pest_control", brand: "Baygon", image: "https://www.dropbox.com/scl/fi/5fzi7pkbo1nyd98p3h8de/7501032925529.jpg?rlkey=7s0uztxhx6mbq1shanqtwefeo&st=ltxh5lnz&raw=1", specs: ["Clave Z: 320304", "Clave SCJ: 356119", "UPC: 7501032925529"] , price: 604.4 },
+                { id: 35, name: "BAYGON ESPIRALES VERDE 10u", category: "pest_control", brand: "Baygon", image: "https://www.dropbox.com/scl/fi/364aa80jy8uwxyp4nh5hc/7501032915339.jpg?rlkey=6psonecfk4qcc35igxitzqk2l&st=ah1v94t3&raw=1", specs: ["Clave Z: 320325", "Clave SCJ: 323028", "UPC: 7501032915339"] , price: 307.2 },
+                { id: 36, name: "BAYGON PLAQUITAS 16u", category: "pest_control", brand: "Baygon", image: "https://www.dropbox.com/scl/fi/ymte4hsi4tlkc98w5kaw7/7501032929763.jpg?rlkey=7kpqclo99mhg0furcgp2brusz&st=2bem5you&raw=1", specs: ["Clave Z: 320277", "Clave SCJ: 322654", "UPC: 7501032929763"] , price: 489.2 },
+                { id: 37, name: "BAYGON PLAQUITAS+APARATO 10u", category: "pest_control", brand: "Baygon", image: "https://www.dropbox.com/scl/fi/wegz9obqh5f9w4u5nb9d1/7501032907716.jpg?rlkey=tf3kwja5vl6glj11jsnfatjsr&st=t5z6qmvl&raw=1", specs: ["Clave Z: 320186", "Clave SCJ: 322653", "UPC: 7501032907716"] , price: 449.8 },
+                { id: 38, name: "OFF FAMILY CREAM 200ml", category: "pest_control", brand: "Off", image: "https://www.dropbox.com/scl/fi/pp77ipffpif1u4q98uiyj/7501032918392.jpg?rlkey=2wvuy7xl09gc637vecka01iyh&st=u1cnqkcc&raw=1", specs: ["Clave Z: 320104", "Clave SCJ: 329702", "UPC: 7501032918392"] , price: 862.7 },
+                { id: 39, name: "REPELENTE OFF AEROSOL 170gr", category: "pest_control", brand: "Off", image: "https://www.dropbox.com/scl/fi/lrn4jlleenk9bk1rywabc/7501032927202.jpg?rlkey=1vl96tte8fy696pwiwqgt6ydp&st=b4m0a44w&raw=1", specs: ["Clave Z: 320037", "Clave SCJ: 337824", "UPC: 7501032927202"] , price: 862.7 },
+                { id: 40, name: "REPELENTE OFF DEEPWOODS AEROSOL 170gr", category: "pest_control", brand: "Off", image: "https://www.dropbox.com/scl/fi/9lftxv9g0m2sbievjewo2/7501032911454.jpg?rlkey=4q4ykoxzjbfqit7zaizt7750w&st=ybb4bifu&raw=1", specs: ["Clave Z: 320239", "Clave SCJ: 337825", "UPC: 7501032911454"] , price: 984.2 },
+                { id: 41, name: "OFF FAMILY CREAM 60ml", category: "pest_control", brand: "Off", image: "https://www.dropbox.com/scl/fi/c50ub12qgxc54tfrkp5b5/7501032911539.png?rlkey=lw6b94rwupqo0r0xt3p7fkyke&st=n8j9dvkq&raw=1", specs: ["Clave Z: 320250", "Clave SCJ: 329703", "UPC: 7501032911539"] , price: 644.8 },
+                { id: 42, name: "REPELENTE AUTAN SPRAY FAMILY 177ml", category: "pest_control", brand: "Off", image: "https://www.dropbox.com/scl/fi/g696uytcv2hdwq5ofc25v/7501032929664.jpg?rlkey=6l138zq7lvn5axb4juqjzsnbu&st=znrbsa6y&raw=1", specs: ["Clave Z: 320312", "Clave SCJ: 333603", "UPC: 7501032929664"] , price: 462.7 },
+                { id: 43, name: "PATO BAÑOS ATOMIZADOR 650ml/12", category: "home_cleaning", brand: "Pato", image: "https://www.dropbox.com/scl/fi/t8sl1bm528zbkz4608mi5/7501032922665.jpg?rlkey=onta4cbabxq2sm3yo0dxev28k&st=ef4l9pri&raw=1", specs: ["Clave Z: 380787", "Clave SCJ: 356055", "UPC: 7501032922665"] , price: 487.8 },
+                { id: 44, name: "PATO ANTIHONGOS ATOMIZADOR 650ml/12", category: "home_cleaning", brand: "Pato", image: "https://www.dropbox.com/scl/fi/xl7q3z02h1x95jbzm46z8/7501032922672.jpg?rlkey=nq43p7xhrhdfrp2c2zns0xa3c&st=8scbc3gu&raw=1", specs: ["Clave Z: 380785", "Clave SCJ: 377609", "UPC: 7501032922672"] , price: 480.3 },
+                { id: 45, name: "PATO BAÑOS REPUESTO 500ml/12", category: "home_cleaning", brand: "Pato", image: "https://www.dropbox.com/scl/fi/rud3akopr9lmix5zizbsq/7501032922702.jpg?rlkey=cesttnfrf9uqxgps8c0fr5brx&st=7opyqsfi&raw=1", specs: ["Clave Z: 380916", "Clave SCJ: 354685", "UPC: 7501032922702"] , price: 210.6 },
+                { id: 46, name: "PATO LIQUIDO AZUL FRESCO 500ml/12", category: "home_cleaning", brand: "Pato", image: "https://www.dropbox.com/scl/fi/zspit81igixhjdrnyqyi2/7501032902735.jpg?rlkey=plsmrtbqmev2usilsqkl7tky6&st=7ga2t9i9&raw=1", specs: ["Clave Z: 380551", "Clave SCJ: 315085", "UPC: 7501032902735"] , price: 413.6 },
+                { id: 47, name: "PATO MM DISCOS ACTIVOS CITRUS 36ml/12", category: "home_cleaning", brand: "Pato", image: "https://www.dropbox.com/scl/fi/d5lo5io08jtl2t04ve8oc/7501032907297.jpg?rlkey=kw9qxilpowuxwe23jzexntmjt&st=sxq4y1rt&raw=1", specs: ["Clave Z: 380724", "Clave SCJ: 351193", "UPC: 7501032907297"] , price: 433.8 },
+                { id: 48, name: "PATO MM DISCOS ACTIVOS BRISA MARINA 36ml/12", category: "home_cleaning", brand: "Pato", image: "https://www.dropbox.com/scl/fi/rijj7l8yo0m6s32vs7zah/7501032907303.jpg?rlkey=puff7fuh7ielnxlzjwa3juhj1&st=3892egw7&raw=1", specs: ["Clave Z: 380725", "Clave SCJ: 378873", "UPC: 7501032907303"] , price: 433.8 },
+                { id: 49, name: "MM TIRAS ACTIVAS LAVANDA 3u/24", category: "home_cleaning", brand: "Pato", image: "https://www.dropbox.com/scl/fi/apy2bxlr10rbnnsg1wk2m/7501032915490.jpg?rlkey=8as0m20uz0k9cr46iwbysvssf&st=tuva0lew&raw=1", specs: ["Clave Z: 380705", "Clave SCJ: 302205", "UPC: 7501032915490"] , price: 383.5 },
+                { id: 50, name: "MM TIRAS ACTIVAS CITRUS 3u/24", category: "home_cleaning", brand: "Pato", image: "https://www.dropbox.com/scl/fi/if6j1z7vsguk55jx3l9p5/7501032915476.jpg?rlkey=3glpw6zwo8e05uiab0ttq8fhh&st=uf7xmm0i&raw=1", specs: ["Clave Z: 380704", "Clave SCJ: 302204", "UPC: 7501032915476"] , price: 383.5 },
+                { id: 51, name: "MM PATO IN TANK TWINPACK 80g/12", category: "home_cleaning", brand: "Pato", image: "https://www.dropbox.com/scl/fi/0p1ih2auwxxolkrrwkda7/7501032935818.jpg?rlkey=tgwerz2n5rnpv71ks0xdsqtll&st=vchk0s4j&raw=1", specs: ["Clave Z: 790132", "Clave SCJ: 367872", "UPC: 7501032935818"] , price: 326.1 },
+                { id: 52, name: "MM PATO IN TANK SINGL SIN CLORO 52g/12", category: "home_cleaning", brand: "Pato", image: "https://www.dropbox.com/scl/fi/ix93b1tmr58uihnj8j767/7501032935672.png?rlkey=bqt5o0nok1j62onots8fptfed&st=onui24j0&raw=1", specs: ["Clave Z: 790305", "Clave SCJ: 367882", "UPC: 7501032935672"] , price: 224.3 },
+                //{ id: 40, name: "", category: "home_cleaning", brand: "Baygon", image: "", specs: ["Clave Z: 790321", "Clave SCJ: 347955", "UPC: 7501032900724"] , price: 620.0 }, Inactivo en SCJ pero activo en Z, se mantiene para no perder el SKU
+                { id: 53, name: "MM PATO IN TANK TWINPACK BLUE", category: "home_cleaning", brand: "Pato", image: "https://www.dropbox.com/scl/fi/1mon65qc08zo2hiuufsow/7501032935603.jpg?rlkey=tluafgzvt5dmlal5f7we0v3i3&st=6ke0pemx&raw=1", specs: ["Clave Z: 790322", "Clave SCJ: 367870", "UPC: 7501032935603"] , price: 181.9 },
+                { id: 54, name: "DRANO DESTAPACAÑOS PLUS 946ml/12", category: "home_cleaning", brand: "Drano", image: "https://www.dropbox.com/scl/fi/tom1wuyr0vdi01jv43nng/7501032970079.jpg?rlkey=rlpcfs21r51xx66oicqjwipyk&st=0qp4dcuj&raw=1", specs: ["Clave Z: 380461", "Clave SCJ: 304859", "UPC: 7501032970079"] , price: 1113.2 },
+                { id: 55, name: "FAMILY GUARD AE FRESCURA CAMPESTRE 275ml/12", category: "home_cleaning", brand: "Family Guard", image: "https://www.dropbox.com/scl/fi/qqc52gemox4r3u8jyvjtf/7501032919443.jpg?rlkey=0fioajhqtelaw9wgejvwvj3h0&st=sd81je17&raw=1", specs: ["Clave Z: 381172", "Clave SCJ: 328181", "UPC: 7501032919443"] , price: 623.1 },
+                { id: 56, name: "FAMILY GUARD AE FRESCURA CAMPESTRE 400ml/12", category: "home_cleaning", brand: "Family Guard", image: "https://www.dropbox.com/scl/fi/gnlan178vnu5vcrr2ll9p/7501032919177.png?rlkey=rx70xec6we0jtio3jenf4tbl2&st=08uzc9pb&raw=1", specs: ["Clave Z: 381173", "Clave SCJ: 363858", "UPC: 7501032919177"] , price: 760.2 },
+                { id: 57, name: "FAMILY GUARD AE FLORAL 400ml/12", category: "home_cleaning", brand: "Family Guard", image: "https://www.dropbox.com/scl/fi/wbptf73xcbjsij6rlo5zl/7501032919351.png?rlkey=p4k5objm83w6v5e9gzah7gi7a&st=xoiu52zw&raw=1", specs: ["Clave Z: 381174", "Clave SCJ: 363854", "UPC: 7501032919351"] , price: 760.2 },
+                { id: 58, name: "FAMILY GUARD ATOMIZADOR CITRUS 650ml/12", category: "home_cleaning", brand: "Family Guard", image: "https://www.dropbox.com/scl/fi/wbptf73xcbjsij6rlo5zl/7501032919351.png?rlkey=p4k5objm83w6v5e9gzah7gi7a&st=7sj4aob5&raw=1", specs: ["Clave Z: 381177", "Clave SCJ: 356661", "UPC: 7501032920548"] , price: 580.6 },
+                { id: 59, name: "FAMILY GUARD ATOMIZADOR FRESCURA MARINA 650ml/12", category: "home_cleaning", brand: "Family Guard", image: "https://www.dropbox.com/scl/fi/s0oc2t3s0d11lyy2u7tr0/7501032920449.jpg?rlkey=dipn4cgpfaokon69b5wkox343&st=br5t8q3v&raw=1", specs: ["Clave Z: 381178", "Clave SCJ: 356639", "UPC: 7501032920449"] , price: 580.6 },
+                { id: 60, name: "FAMILY GUARD DOY PACK CITRUS 500ml/12", category: "home_cleaning", brand: "Family Guard", image: "https://www.dropbox.com/scl/fi/qusykce0b7w9qti8ofajs/7501032920579.jpg?rlkey=lgkmnvjf4f7radut8nst9cf12&st=f77mndkm&raw=1", specs: ["Clave Z: 381179", "Clave SCJ: 328189", "UPC: 7501032920579"] , price: 241.1 },
+                { id: 61, name: "FAMILY GUARD DOY PACK FRESCURA MARINA 500ml/12", category: "home_cleaning", brand: "Family Guard", image: "https://www.dropbox.com/scl/fi/apbjg9m0wd4n4oxa2epd5/7501032920524.jpg?rlkey=72zzrcdh9sqhfdxjx4cukxsgf&st=piyxu8h6&raw=1", specs: ["Clave Z: 381180", "Clave SCJ: 328186", "UPC: 7501032920524"] , price: 241.1 },
+                { id: 62, name: "PLEDGE ARSL MADERAS 378ml/12", category: "home_cleaning", brand: "Pledge", image: "https://www.dropbox.com/scl/fi/pzqqfl930bh8qqjqb8894/7501032915155.jpg?rlkey=shlfpeg08seaqqw2n2mtzt0nj&st=73cvqlej&raw=1", specs: ["Clave Z: 10157", "Clave SCJ: 357080", "UPC: 7501032915155"] , price: 753.7 },
+                { id: 63, name: "PLEDGE ARSL SACUDIDOR LIMON 378ml/12", category: "home_cleaning", brand: "Pledge", image: "https://www.dropbox.com/scl/fi/pemvassbedy181jzb7h6e/7503026029091.jpg?rlkey=sdrsaewwb185sv8ktbmosrbvv&st=tk783ymg&raw=1", specs: ["Clave Z: 381277", "Clave SCJ: 357104", "UPC: 7503026029091"] , price: 748.1 },
+                { id: 64, name: "PLEDGE MADERAS NARANJA 378ml/12", category: "home_cleaning", brand: "Pledge", image: "https://www.dropbox.com/scl/fi/njwbl7udp9lqb7zgeapc6/7503026029152.jpg?rlkey=nxqir7nsf920ky6oindorq2js&st=e59jwdey&raw=1", specs: ["Clave Z: 381278", "Clave SCJ: 357082", "UPC: 7503026029152"] , price: 753.7 },
+                { id: 65, name: "PLEDGE MADERAS MINI 275ml/12", category: "home_cleaning", brand: "Pledge", image: "https://www.dropbox.com/scl/fi/glglzulgcybd3qkgh9wph/7503026029060.jpg?rlkey=pz6u4rmz16a42dbggzww0asem&st=frpncs56&raw=1", specs: ["Clave Z: 381279", "Clave SCJ: 357090", "UPC: 7503026029060"] , price: 508.8 },
+                { id: 66, name: "PLEDGE MULTISUPERFICIES ATOMIZADOR 650ml/12", category: "home_cleaning", brand: "Pledge", image: "https://www.dropbox.com/scl/fi/b65x54v226mx10wx54b1w/7501032922825.jpg?rlkey=j3nd7v6k3do2werwuoxqor5o3&st=rg8i87cw&raw=1", specs: ["Clave Z: 381146", "Clave SCJ: 356051", "UPC: 7501032922825"] , price: 627.4 },
+                { id: 67, name: "PLEDGE MUEBLES ACEITE ROJO 500ml/12", category: "home_cleaning", brand: "Pledge", image: "https://www.dropbox.com/scl/fi/ccmupfr18wkb876z9ngh6/7501032915261.jpg?rlkey=xiub3tk07wstqnywr7f7qkpdf&st=d4ycyhh4&raw=1", specs: ["Clave Z: 10216", "Clave SCJ: 302339", "UPC: 7501032915261"] , price: 891.5 },
+                { id: 68, name: "MR MUSCULO VIDRIOS 650ml/12", category: "home_cleaning", brand: "Mr. Musculo", image: "https://www.dropbox.com/scl/fi/fjufy2mkjvgvug1n6g20p/7503051868252.jpg?rlkey=3ij9mmjtpvdvx9fhj7g6a5ywo&st=q06mmjy7&raw=1", specs: ["Clave Z: 381394", "Clave SCJ: 386319", "UPC: 7503051868252"] , price: 415.4 },
+                { id: 69, name: "MM DESENGRASANTE DOYPACK 500ml/12", category: "home_cleaning", brand: "Mr. Musculo", image: "https://www.dropbox.com/scl/fi/pb8wfil5981gh57hx13mu/7501032903909.jpg?rlkey=0pn5h395v8yguudwcfrwxummj&st=nzjcbs1q&raw=1", specs: ["Clave Z: 380703", "Clave SCJ: 354673", "UPC: 7501032903909"] , price: 212.7 },
+                { id: 70, name: "MM COCINA LIMON DOYPACK 500ml/12", category: "home_cleaning", brand: "Mr. Musculo", image: "https://www.dropbox.com/scl/fi/souogsqtnf47xro6znckx/7501032906801.jpg?rlkey=j8yjinpb2fd8in1udgngka9we&st=y880ur45&raw=1", specs: ["Clave Z: 380499", "Clave SCJ: 354675", "UPC: 7501032906801"] , price: 212.7 },
+                { id: 71, name: "MM DESENGRASANTE LIMON ATOMIZADOR 650ml/12", category: "home_cleaning", brand: "Mr. Musculo", image: "https://www.dropbox.com/scl/fi/bxslexa5597pfcuiwua5v/7706800045229.jpg?rlkey=y4l3tg1azptz2ixqwh1c3jx49&st=a25wcq1i&raw=1", specs: ["Clave Z: 381144", "Clave SCJ: 356125", "UPC: 7706800045229"] , price: 492.8 },
+                { id: 72, name: "MM DESENGRASANTE ATOMIZADOR 650ml/12", category: "home_cleaning", brand: "Mr. Musculo", image: "https://www.dropbox.com/scl/fi/20vnq78euqg0by06tjuxc/7706800790594.jpg?rlkey=mkk5pciyhibyzm07taxaxbzz6&st=9g5qgz9t&raw=1", specs: ["Clave Z: 381143", "Clave SCJ: 356123", "UPC: 7706800790594"] , price: 492.8 },
+                { id: 73, name: "MM BAÑOS ATOMIZADOR", category: "home_cleaning", brand: "Mr. Musculo", image: "", specs: ["Clave Z: 381149", "Clave SCJ: 356057", "UPC: 7706800267140"] , price: 406 },
+                { id: 74, name: "MM DESTRUCTOR ATOMIZADOR 500ml/12", category: "home_cleaning", brand: "Mr. Musculo", image: "https://www.dropbox.com/scl/fi/0t74gkwi31bg2lye78mj5/7706800643258.jpg?rlkey=8r2fievzzxb2xnz3y3z5aqdub&st=iq24azjj&raw=1", specs: ["Clave Z: 381140", "Clave SCJ: 356121", "UPC: 7706800643258"] , price: 431 },
+                { id: 75, name: "MM ANTIHONGOS ATOMIZADOR 500ml/12", category: "home_cleaning", brand: "Mr. Musculo", image: "https://www.dropbox.com/scl/fi/ld207lni2h9vdt2tgamc2/7706800227007.jpg?rlkey=8ib6nqh1t0dkh5876kq3od7yd&st=2b73lxf7&raw=1", specs: ["Clave Z: 381141", "Clave SCJ: 377615", "UPC: 7706800227007"] , price: 465.5 },
+                { id: 76, name: "WINDEX ORIGINAL ATOMIZADOR 640ml/12", category: "home_cleaning", brand: "Windex", image: "https://www.dropbox.com/scl/fi/f3w9i8r725i2j1648gecs/7501032922795.jpg?rlkey=li1srjyvghujw9r0u10ugeyxv&st=wgwg1xtu&raw=1", specs: ["Clave Z: 381147", "Clave SCJ: 356131", "UPC: 7501032922795"] , price: 549.8 },
+                { id: 77, name: "WINDEX CRYSTAL RAIN 640ml/12", category: "home_cleaning", brand: "Windex", image: "https://www.dropbox.com/scl/fi/o6pfckplspoa9md83tl1d/7501032922788.jpg?rlkey=jeazikmdttfkb9wjmpbodvvq4&st=65ydlp3t&raw=1", specs: ["Clave Z: 381148", "Clave SCJ: 356133", "UPC: 7501032922788"] , price: 549.8 },
+                { id: 78, name: "WINDEX LIMPIA VIDRIOS ORIGINAL DOY PACK 500ml/12", category: "home_cleaning", brand: "Windex", image: "https://www.dropbox.com/scl/fi/b1w29u5vqo3vc0sqz678b/7501032929282.jpg?rlkey=x7s73q2ue1mccrv8vbwp98z95&st=cgpd8f5h&raw=1", specs: ["Clave Z: 381074", "Clave SCJ: 354679", "UPC: 7501032929282"] , price: 237.4 },
+                { id: 79, name: "WINDEX CRYSTAL RAIN DOY PACK 500ml/12", category: "home_cleaning", brand: "Windex", image: "https://www.dropbox.com/scl/fi/0mmwgfhx0i4l1jl10n6y8/7501032929299.jpg?rlkey=35lx4efbih70tvnxjj5brgofn&st=zwuhj26n&raw=1", specs: ["Clave Z: 381073", "Clave SCJ: 354683", "UPC: 7501032929299"] , price: 237.4 },
+                { id: 80, name: "WINDEX VINAGRE ATOMIZADOR 640ml/12", category: "home_cleaning", brand: "Windex", image: "https://www.dropbox.com/scl/fi/3pee9vx7h0341rl6mx8dc/7501032922801.jpg?rlkey=osf3tnaiu88joonwphqq56x2f&st=6oppows6&raw=1", specs: ["Clave Z: 380552", "Clave SCJ: 356135", "UPC: 7501032922801"] , price: 549.8 },
+                { id: 81, name: "MM WINDEX VIDRIOS DOY PACK 500ml/12", category: "home_cleaning", brand: "Windex", image: "https://www.dropbox.com/scl/fi/sdpowjo5s8odvi5khcjt0/7501032903886.jpg?rlkey=qdutasgia6dowcv9a5klodl5i&st=e6joikkn&raw=1", specs: ["Clave Z: 380701", "Clave SCJ: 356572", "UPC: 7501032903886"] , price: 182.6 },
+                { id: 82, name: "GLADE AE CAMPOS DE LAVANDA 400ml/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/t3akcn6u4c5humeil6nt3/7501032938215.jpg?rlkey=2u10swm0rlf91dpc7i4iegd5v&st=2b7dalx0&raw=1", specs: ["Clave Z: 790036", "Clave SCJ: 377743", "UPC: 7501032938215"] , price: 542.8 },
+                { id: 83, name: "GLADE AE HAWAHAN BREEZE 400ml/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/34u44i8mfa1wknp3ss0py/0046500005602.jpg?rlkey=0a7dgquzzrc1vc9dulcnjrzrw&st=hofmae65&raw=1", specs: ["Clave Z: 380311", "Clave SCJ: 377260", "UPC: 46500005602"] , price: 542.8 },
+                { id: 84, name: "GLADE AE JARDIN CAMPESTRE 400ml/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/wr0vlewjk9e6n6uja7457/0046500006210.jpg?rlkey=9yw3nf7alrptoza83pybxkd59&st=4rfhib63&raw=1", specs: ["Clave Z: 790038", "Clave SCJ: 377218", "UPC: 46500006210"] , price: 542.8 },
+                { id: 85, name: "GLADE AE MANZANA CANELA 400ml/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/f1apq1zuuzlpozg3r2agy/7501032900243.jpg?rlkey=m3q8pjxy6idfvhppin17nuy1s&st=3okapjgr&raw=1", specs: ["Clave Z: 790156", "Clave SCJ: 377276", "UPC: 7501032900243"] , price: 542.8 },
+                { id: 86, name: "GLADE AE PARAISO AZUL 400ml/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/14cno2cf3uebkvkqp7iph/7501032916176.jpg?rlkey=6m70qwnm7hxzxmeql8221hx1x&st=vvjex01d&raw=1", specs: ["Clave Z: 790295", "Clave SCJ: 377274", "UPC: 7501032916176"] , price: 542.8 },
+                { id: 87, name: "GLADE AE PARAISO AZUL 430ml/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/vnziby4t5xsb8h7dtlk89/7503049616834.jpg?rlkey=bij2ld3gsipa5kx9bpsukc6by&st=bzb1layz&raw=1", specs: ["Clave Z: 790469", "Clave SCJ: 381404", "UPC: 7503049616834"] , price: 542.8 },
+                { id: 88, name: "GLADE AE LEMON FRESH 400ml/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/v7fgu56gksdnzipdzyywj/7501032907075.jpg?rlkey=fozkgqevx31qgj7nwklupwta9&st=immpt7i8&raw=1", specs: ["Clave Z: 790311", "Clave SCJ: 377278", "UPC: 7501032907075"] , price: 542.8 },
+                { id: 89, name: "GLADE AE FORBIDDEN BERRIES 400ml/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/9tymh0r4a0nr3wtlv3eh9/7501032930851.jpg?rlkey=q1pf0eo76tiz8mmtyl91o28lv&st=6yfnxm95&raw=1", specs: ["Clave Z: 790412", "Clave SCJ: 377262", "UPC: 7501032930851"] , price: 542.8 },
+                { id: 90, name: "GLADE AE SANDIA 400ml/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/kdqhjqi5do3ltjg8too9h/7503036165383.jpg?rlkey=yoyn2ky5zdvngyx9m9skuftw1&st=jgh402a8&raw=1", specs: ["Clave Z: 790453", "Clave SCJ: 379114", "UPC: 7503036165383"] , price: 542.8 },
+                { id: 91, name: "GLADE AE ALEGRIA FLORAL Y FRUTOS ROJOS 275ml/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/7j9gmmlpf4fpojbhvz9ur/7501032924010.jpg?rlkey=y3najfl5bcjk75zsadw6pm37c&st=70gsr2ux&raw=1", specs: ["Clave Z: 790375", "Clave SCJ: 377266", "UPC: 7501032924010"] , price: 388.1 },
+                { id: 92, name: "GLADE AE CAMPOS DE LAVANDA 275ml/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/iavugfpkpmenb8q6r556n/7501032924003.jpg?rlkey=k501zq93j1zlhhhnc2nqnywip&st=ozvzhl8x&raw=1", specs: ["Clave Z: 790376", "Clave SCJ: 377264", "UPC: 7501032924003"] , price: 388.1 },
+                { id: 93, name: "GLADE AE MANZANA CANELA 275ml/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/s4dicnk3bpuv93kk3gew2/7501032923990.jpg?rlkey=tb0r5lk5rpz25s26fl8moqreu&st=95a1bfkd&raw=1", specs: ["Clave Z: 790377", "Clave SCJ: 377270", "UPC: 7501032923990"] , price: 388.1 },
+                { id: 94, name: "GLADE AE SANDIA 275ml/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/tl9xgpyi261oxar9dgnqv/7503036165437.jpg?rlkey=hkkng1tdcgi62j6042zpjy9gi&st=cea8ji5z&raw=1", specs: ["Clave Z: 790456", "Clave SCJ: 379116", "UPC: 7503036165437"] , price: 388.1 },
+                { id: 95, name: "GLADE GEL CUBO MANZANA CANELA 180gr/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/reqldyndtjqgu55vcptmg/7501032922849.jpg?rlkey=2y8fkgikfqm1zita8danofcoj&st=fh1ago9e&dl=1", specs: ["Clave Z: 790415", "Clave SCJ: 388504", "UPC: 7501032922849"] , price: 364.7 },
+                { id: 96, name: "GLADE GEL CUBO LAVANDA 180gr/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/gqmhj6b025r8mgxgo1oia/7501032922856.jpg?rlkey=s0aw9zb4t4x1c2zygngxvth50&st=rx5v2bhq&raw=1", specs: ["Clave Z: 790416", "Clave SCJ: 388505", "UPC: 7501032922856"] , price: 364.7 },
+                { id: 97, name: "GLADE GEL CUBO HAWAIIAN BREEZE 180gr/12", category: "air_care", brand: "Glade", image: "https://www.dropbox.com/scl/fi/uc1cnc43j8aplxb1lhp3v/7501032922863.jpg?rlkey=aqg1fkye3p8tolw92n9fue0n7&st=l3iv2xse&raw=1", specs: ["Clave Z: 790417", "Clave SCJ: 388397", "UPC: 7501032922863"] , price: 364.7 },
+                { id: 98, name: "ZIPLOC CONGELAR GRANDE 15u", category: "home_storage", brand: "Ziploc", image: "https://www.dropbox.com/scl/fi/kc5yshabnfjm2iyi0dfvw/7501032990046-1.jpg?rlkey=kvagpye1d9wm2cj3thw8gppq4&st=yt9g06pi&raw=1", specs: ["Clave Z: 40188", "Clave SCJ: 359004", "UPC: 7501032990046"] , price: 622.8 },
+                { id: 99, name: "ZIPLOC GUARDAR MEDIANA 25u", category: "home_storage", brand: "Ziploc", image: "https://www.dropbox.com/scl/fi/2ejg7mxqji6ie3twovmtn/7501032990015-1.jpg?rlkey=d556i7z1usk8zapfrp3325iee&st=0k3speaf&raw=1", specs: ["Clave Z: 40189", "Clave SCJ: 314775", "UPC: 7501032990015"] , price: 571.7 },
+                { id: 100, name: "ZIPLOC GUARDAR GRANDE 20u", category: "home_storage", brand: "Ziploc", image: "https://www.dropbox.com/scl/fi/97k9we37d3b1yw871vwl5/7501032990022-1.jpg?rlkey=oh01dbblo61mc665zzzi1nyas&st=vs3bghlu&raw=1", specs: ["Clave Z: 40190", "Clave SCJ: 314776", "UPC: 7501032990022"] , price: 564.6 },
+                { id: 101, name: "ZIPLOC CONGELAR MEDIANA 20u", category: "home_storage", brand: "Ziploc", image: "https://www.dropbox.com/scl/fi/nktrpfuln2b1s2hxspdi4/7501032990039-1.jpg?rlkey=vkxeu0pmsasr825kkj7q2y8l7&st=ifj2gg0h&raw=1", specs: ["Clave Z: 40191", "Clave SCJ: 314774", "UPC: 7501032990039"] , price: 571.6 },
+                { id: 102, name: "ZIPLOC SANDWICH 50u", category: "home_storage", brand: "Ziploc", image: "https://www.dropbox.com/scl/fi/9moj3dj6uwnn0iq9uqhox/7501032990053-1.jpg?rlkey=y2iqrstfpc24mif0fzjma75ry&st=fkrg96ah&raw=1", specs: ["Clave Z: 40192", "Clave SCJ: 364954", "UPC: 7501032990053"] , price: 469 },
+                { id: 103, name: "ZIPLOC CIERRE FACIL GRANDE 10u", category: "home_storage", brand: "Ziploc", image: "https://www.dropbox.com/scl/fi/4sl9kfgg6qiuuuops9r0b/7501032900335-1.jpg?rlkey=o41zotkk1p6hfsc4tyo7ro1nn&st=yle7fped&raw=1", specs: ["Clave Z: 40321", "Clave SCJ: 317033", "UPC: 7501032900335"] , price: 554.1 },
+                { id: 104, name: "ZIPLOC CIERRE FACIL MEDIANA 15u", category: "home_storage", brand: "Ziploc", image: "https://www.dropbox.com/scl/fi/49byuuwsaa4t1jwnqphmk/7501032900342-1.jpg?rlkey=4rr6n38dylaqwtnwntp4wpjp6&st=1c2dxrb9&raw=1", specs: ["Clave Z: 40322", "Clave SCJ: 317034", "UPC: 7501032900342"] , price: 570.1 },
+                { id: 105, name: "INSECTICIDA RAID ESPIRALES RAIDOLITO VERDE Y LAVANDA 6 /50 UD", category: "npds", image: "", specs: ["Clave Z: 320340", "Clave SCJ: 379135", "UPC: 7503049616674"] , price: 0 }, //No se encontró imagen
+                { id: 106, name: "OFF SPRAY FAMILY 100ml/12", category: "npds", brand: "Off", image: "https://www.dropbox.com/scl/fi/ser0cm8f18srkz4fpdl0o/07503051868238.jpg?rlkey=f6fpw30d1qakssqnf3mtlpa92&st=mkdqt0n8&raw=1", specs: ["Clave Z: 320354", "Clave SCJ: 386308", "UPC: 7503051868238"] , price: 500 },
+                { id: 107, name: "AROMATIZANTE GLADE MINI GEL ALEGRIA FLORAL Y FRUTOS 12/70", category: "npds", brand: "Glade", image: "https://www.dropbox.com/scl/fi/6z8i3d0ceshyz41mq4x0q/7591005998308.jpg?rlkey=9ooakzs8wm3svsyj6obbrnwkb&st=89ceflw0&raw=1", specs: ["Clave Z: 790474", "Clave SCJ: 344522", "UPC: 7591005998308"] , price: 127.2 },
+                { id: 108, name: "AROMATIZANTE GLADE MINI GEL LAVANDA 12/70", category: "npds", brand: "Glade", image: "https://www.dropbox.com/scl/fi/zmtw2q98v21fju4tt9916/7591005998292.jpg?rlkey=4hxvtuvt2gph44uu5fic67o95&st=f229eobc&raw=1", specs: ["Clave Z: 790475", "Clave SCJ: 378529", "UPC: 7591005998292"] , price: 127.2 },
+                { id: 109, name: "AROMATIZANTE GLADE MINI GEL MORA RADIANTE  12/70", category: "npds", brand: "Glade", image: "https://www.dropbox.com/scl/fi/gfw9h5mtv4lx91qxmv6j3/7702430041280.jpg?rlkey=3jrdht93qmhw17fotvxaub711&st=ulorqqee&raw=1", specs: ["Clave Z: 790476", "Clave SCJ: 378535", "UPC: 7702430041280"] , price: 127.2 },
+                { id: 110, name: "AROMATIZANTE GLADE MINI GEL LIMON  12/70", category: "npds", brand: "Glade", image: "https://www.dropbox.com/scl/fi/zrekt00bku7acu9k2x6sj/7591005998285.jpg?rlkey=t16e6ct22nmrsynoi2bjxy1z9&st=t3pzyehj&raw=1", specs: ["Clave Z: 790477", "Clave SCJ: 378527", "UPC: 7591005998285"] , price: 127.2 },
+                { id: 111, name: "LIMPIADOR MR MUSCULO WINDEX ATOMIZADOR VIDRIOS 12/ 650 ML", category: "npds", brand: "Mr. Musculo", image: "https://www.dropbox.com/scl/fi/j7cybd6sapi1mz4edlazb/7503051868252-2.jpg?rlkey=d60d5yxxjok0ovljqgrhik2g7&st=loej0ksj&raw=1", specs: ["Clave Z: 381394", "Clave SCJ: 386319", "UPC: 7503051868252"] , price: 415.4 },
+                { id: 112, name: "VARITA AROMATIZANTE GLADE LAVANDA FELIZ 12/ 100", category: "nuevos_productos", brand: "Glade", image: "https://www.dropbox.com/scl/fi/mmh23rv8l1yy5phzsvfj0/7503038992345-1.jpg?rlkey=kqkvzts5em1wbf9beu2598sao&st=50b6jmjz&raw=1", specs: ["Clave Z: 790489", "Clave SCJ: 392837", "UPC: 7503038992345"] , price: 961.7 },
+                { id: 113, name: "VARITA AROMATIZANTE GLADE DULCES CITRICOS FELIZ", category: "nuevos_productos", brand: "Glade", image: "https://www.dropbox.com/scl/fi/gtzs0pxebxvjroyhwiafg/7503038992352-1.jpg?rlkey=manokjp9l81yosnkf0qax1yhs&st=u7cfvxlp&raw=1", specs: ["Clave Z: 790490", "Clave SCJ: 392839", "UPC: 7503038992352"] , price: 961.7 },
+                { id: 114, name: "AROMATIZANTE AMBIENTAL GLADE LIQUIDO LAVANDA RELAJANTE 12 / 21 ML", category: "nuevos_productos", brand: "Glade", image: "https://www.dropbox.com/scl/fi/zmod7tz2jizgh5g9khcnw/7503038992369-1.jpg?rlkey=wh9mcdg9tfsnlt79s2ubnpouo&st=3czwdwds&raw=1", specs: ["Clave Z: 790491", "Clave SCJ: 364607", "UPC: 7503038992369"] , price: 894.7 },
+                { id: 115, name: "AROMATIZANTE AMBIENTAL GLADE SPRAY LAVANDA RELAJANTE 12 / 230 ML", category: "nuevos_productos", brand: "Glade", image: "https://www.dropbox.com/scl/fi/7di5r3jb0bvrfs4e121js/7503046433816-1.jpg?rlkey=lkdfdw2tccp96k8eixgcxyogp&st=yfhzsd3q&raw=1", specs: ["Clave Z: 790492", "Clave SCJ: 377592", "UPC: 7503046433816"] , price: 543.1 },
+                { id: 116, name: "TOALLITA DESINFECTANTE FAMILY GUARD CITRICOS 12/ 80 UD", category: "nuevos_productos", brand: "Glade", image: "https://www.dropbox.com/scl/fi/pcj4p14fi8kodsf4w2skz/7503051868993-2.jpg?rlkey=21qi2msepvfcbhyllz6kqr1kb&st=18lae3lu&raw=1", specs: ["Clave Z: 360058", "Clave SCJ: 389979", "UPC: 7503051868993"] , price: 754.6 },
+                { id: 117, name: "PASTILLA PERFUMADA PATO BRISA", category: "nuevos_productos", brand: "Pato", image: "https://www.dropbox.com/scl/fi/fhtejhauvklxob8jazzb1/7503051868269-1.jpg?rlkey=rbcgdm8u73ikcxhmsc1goahqt&st=hpqig3oa&raw=1", specs: ["Clave Z: 790473", "Clave SCJ: 386564", "UPC: 7503051868269"] , price: 460.2 },
+                { id: 118, name: "PASTILLA PERFUMADA PATO BRISA", category: "nuevos_productos", brand: "Pato", image: "https://www.dropbox.com/scl/fi/6hsv72ct5oxj5a55uy1xn/7503051868276-1.png?rlkey=7z1kkqxqsteuky8v5x2hmaku3&st=h4pl6ua1&raw=1", specs: ["Clave Z: 790472", "Clave SCJ: 391270", "UPC: 7503051868276"] , price: 460.2 },
+                { id: 119, name: "AROMATIZANTE GLADE AEROSOL ELIXIR FLORAL 12/ 400 ML", category: "nuevos_productos", brand: "Glade", image: "https://www.dropbox.com/scl/fi/j809ztv7dk82dkjncdn2v/7503049616032.jpg?rlkey=af6ek2a3eks2cm2psbmodcivx&st=gahxdfcv&raw=1", specs: ["Clave Z: 790493", "Clave SCJ: 377958", "UPC: 7503049616032"] , price: 533.5 },
+                { id: 120, name: "AROMATIZANTE GLADE AEROSOL ELIXIR FLORAL 12/ 275", category: "nuevos_productos", brand: "Glade", image: "https://www.dropbox.com/scl/fi/xkui3ty4x782p4dnhesz3/7503049616049.jpg?rlkey=dihgozuvb4gpxlxpmt4cigguz&st=ws1vslsy&raw=1", specs: ["Clave Z: 790494", "Clave SCJ: 378029", "UPC: 7503049616049"] , price: 378.3 },
+                { id: 121, name: "AROMATIZANTE GLADE AEROSOL NECTARINE 12/ 400 ML ", category: "nuevos_productos", brand: "Glade", image: "https://www.dropbox.com/scl/fi/a4vokc63np0v2ojk8z6a6/7503053774636.jpg?rlkey=mxw5knv7emu99tooaqpnxjazi&st=ojs87mp4&raw=1", specs: ["Clave Z: 392014", "Clave SCJ: 392014", "UPC: 7503053774636"] , price: 517.9 },
+                { id: 122, name: "AROMATIZANTE GLADE AEROSOL NECTARINE 12/ 275 ML", category: "nuevos_productos", brand: "Glade", image: "https://www.dropbox.com/scl/fi/u0eu7n1jm8xyty5h1dtfg/7503053774650.jpg?rlkey=yerewl2hq6cmfvyts3z7zbk1j&st=t2cwsbb2&raw=1", specs: ["Clave Z: 392018", "Clave SCJ: 392018", "UPC: 7503053774650"] , price: 367.2 },
+                { id: 123, name: "AROMATIZANTE GLADE AEROSOL COCO 12/ 400 ML", category: "nuevos_productos", brand: "Glade", image: "https://www.dropbox.com/scl/fi/ps5a1so04zcfdkjtn6ax1/7503049616261.jpg?rlkey=ysj405qeiajfm25pjkdrfgpbo&st=koceqque&raw=1", specs: ["Clave Z: 378357", "Clave SCJ: 378357", "UPC: 7503049616261"] , price: 517.9 },
+                { id: 124, name: "AROMATIZANTE GLADE AEROSOL COCO 12/ 275 ML", category: "nuevos_productos", brand: "Glade", image: "https://www.dropbox.com/scl/fi/5qdopfwfxft5qt61pzi59/7503049616292.jpg?rlkey=ua0g23y66hyavnadtftdecsjm&st=b1w3q7mx&raw=1", specs: ["Clave Z: 378413", "Clave SCJ: 378413", "UPC: 7503049616292"] , price: 367.9 },
+                { id: 125, name: "INSECTICIDA BAYGON ULTRA VERDE 400+BAYGON PODER MO 6 / 2 UD", category: "special packs", brand: "special packs", image: "https://www.dropbox.com/scl/fi/qghstww0noh4op3171oot/7503055129793-1.png?rlkey=6he9p78xoybrejsyvise1ss78&st=x68lwnr2&raw=1", specs: ["Clave Z: 320361", "Clave SCJ: 396083", "UPC: 7503055129793"] , price: 0 },
+                { id: 126, name: "INSECTICIDA RAID MAX 400ML + RAID MAX 226 ML", category: "special packs", brand: "special packs", image: "https://www.dropbox.com/scl/fi/ykabo4m44e8g13eahp0k9/7501032921040.jpg?rlkey=sdpza3mtuvpksg1qv8nlh844k&st=a3nfk4hk&raw=1", specs: ["Clave Z: 320362", "Clave SCJ: 386256", "UPC: 7501032921040"] , price: 845.63 },
+                { id: 127, name: "INSECTICIDA RAID CASA JARDIN 400+RAID 226 ML", category: "special packs", brand: "special packs", image: "https://www.dropbox.com/scl/fi/5ywvu4zfwzhxrhv7cw3yh/7501032921071.jpg?rlkey=y4nfv5h70bsg883b22sdq3r9v&st=njf6vhto&raw=1", specs: ["Clave Z: 320363", "Clave SCJ: 317410", "UPC: 7501032921071"] , price: 751.13 },
+                { id: 128, name: "INSECTICIDA RAID ESPIRALES RAIDOLITO VERDE Y LAVANDA 6 /50 UD", category: "special packs", brand: "special packs", image: "", specs: ["Clave Z: 320340", "Clave SCJ: 379135", "UPC: 7503049616674"] , price: 260.7 },
+            
+
+
+                { id: 62, name: "Raidolito Espirales 12pz", category: "pest_control", brand: "Raidolito", image: "https://images.unsplash.com/photo-1596627606373-195977a49936?w=500&q=80", specs: ["Contenido: 12 espirales", "Duración: 4 horas", "Uso: Exterior"] , price: 961.0 }
+            ];
+        };
+
+        let products = generateProducts();
+        let calcItems = [];
+
+        // --- APP STATE & NAVIGATION ---
+        function switchView(viewName) {
+            document.getElementById('view-dashboard').classList.add('hidden');
+            document.getElementById('view-catalog').classList.add('hidden');
+            document.getElementById('view-calculator').classList.add('hidden');
+            document.getElementById('nav-dashboard').classList.remove('nav-active');
+            document.getElementById('nav-catalog').classList.remove('nav-active');
+            document.getElementById('nav-calculator').classList.remove('nav-active');
+
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+            document.getElementById(`nav-${viewName}`).classList.add('nav-active');
+
+            if (viewName === 'dashboard') updateDashboard();
+        }
+
+        // --- CALCULATOR LOGIC ---
+        function addCalcItem() {
+            const claveInput = document.getElementById('calc-clave').value.trim().toLowerCase();
+            const qtyInput = parseInt(document.getElementById('calc-qty').value);
+
+            if (!claveInput || isNaN(qtyInput) || qtyInput <= 0) {
+                alert("Por favor ingrese una clave válida y una cantidad mayor a 0.");
+                return;
+            }
+
+            let product = null;
+            let matchedSpec = null;
+
+            for (const p of products) {
+                if (!p.specs) continue;
+                for (const spec of p.specs) {
+                    const match = spec.match(/(\d{6,})/);
+                    if (match && match[1] && match[1].toLowerCase() === claveInput) {
+                        product = p;
+                        matchedSpec = spec;
+                        break;
+                    }
+                }
+                if (product) break;
+            }
+
+
+            if (!product) {
+                alert("Producto no encontrado con esa clave.");
+                return;
+            }
+
+            const unitPrice = product.price;
+            const total = parseFloat((unitPrice * qtyInput).toFixed(2));
+
+            calcItems.push({
+                clave: matchedSpec,
+                name: product.name,
+                unitPrice: unitPrice,
+                qty: qtyInput,
+                total: total
+            });
+
+            document.getElementById('calc-clave').value = '';
+            document.getElementById('calc-qty').value = '1';
+
+            renderCalcTable();
+        }
+
+        function renderCalcTable() {
+            const tbody = document.getElementById('calc-table-body');
+            const summary = document.getElementById('calc-total-summary');
+
+            if (calcItems.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-400 italic">No hay productos ingresados.</td></tr>';
+                summary.innerText = "$0.00";
+                return;
+            }
+
+            tbody.innerHTML = '';
+            let grandTotal = 0;
+
+            calcItems.forEach((item, index) => {
+                grandTotal += item.total;
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50 transition border-b border-gray-100 last:border-0 group">
+                        <td class="p-3 text-gray-900 font-medium">${item.clave}</td>
+                        <td class="p-3 text-gray-700 max-w-xs truncate" title="${item.name}">${item.name}</td>
+                        <td class="p-3 text-gray-700 text-right">$${item.unitPrice.toFixed(2)}</td>
+                        <td class="p-3 text-gray-700 text-center">
+                            <input type="number" min="1" value="${item.qty}" onchange="updateCalcItemQty(${index}, this.value)" class="w-16 px-2 py-1 border border-gray-200 rounded text-center focus:outline-none focus:border-blue-500">
+                        </td>
+                        <td class="p-3 font-semibold text-gray-900 text-right flex justify-end items-center gap-4">
+                            $${item.total.toFixed(2)}
+                            <button onclick="removeCalcItem(${index})" class="text-gray-300 hover:text-red-500 transition opacity-0 group-hover:opacity-100">×</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            summary.innerText = "$" + grandTotal.toFixed(2);
+
+            // Update date
+            const dateStr = new Date().toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            document.getElementById('calc-date').innerText = "Generado: " + dateStr;
+        }
+
+        function updateCalcItemQty(index, newQty) {
+            const qty = parseInt(newQty);
+            if (isNaN(qty) || qty <= 0) return;
+            calcItems[index].qty = qty;
+            calcItems[index].total = parseFloat((calcItems[index].unitPrice * qty).toFixed(2));
+            renderCalcTable();
+        }
+
+        function removeCalcItem(index) {
+            calcItems.splice(index, 1);
+            renderCalcTable();
+        }
+
+        function generateCalcXLSX() {
+            if (calcItems.length === 0) {
+                alert("No hay productos en la lista para exportar.");
+                return;
+            }
+
+            const btn = document.querySelector('button[onclick="generateCalcXLSX()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ Generando...';
+            btn.disabled = true;
+
+            // Prepare data for worksheet
+            const headers = ["Clave", "Nombre", "Precio Unitario", "Cajas", "Total"];
+            const data = calcItems.map(item => [
+                item.clave,
+                item.name,
+                item.unitPrice,
+                item.qty,
+                item.total
+            ]);
+
+            // Calculate grand total
+            const grandTotal = calcItems.reduce((sum, item) => sum + item.total, 0);
+            data.push([]); // Add a blank row for spacing
+            data.push(["", "", "", "Gran Total:", grandTotal]);
+
+
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+
+            // Style the headers and total row
+            const ws_range = XLSX.utils.decode_range(ws['!ref']);
+            for (let C = ws_range.s.c; C <= ws_range.e.c; ++C) {
+                const header_cell_address = XLSX.utils.encode_cell({r: 0, c: C});
+                if(ws[header_cell_address]) {
+                    ws[header_cell_address].s = { font: { bold: true }, fill: { fgColor: { rgb: "FFFDE7" } } };
+                }
+                const total_cell_address = XLSX.utils.encode_cell({r: data.length, c: C});
+                 if(ws[total_cell_address]) {
+                    ws[total_cell_address].s = { font: { bold: true } };
+                }
+            }
+                  ws['E' + (data.length + 1)].s = { font: { bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "right" } };
+                  ws['D' + (data.length + 1)].s = { font: { bold: true }, alignment: { horizontal: "right" } };
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Listado de Costos");
+
+            try {
+                XLSX.writeFile(wb, "Listado_Costos_PCZ.xlsx");
+            } catch (err) {
+                console.error("XLSX generation error", err);
+                alert("Hubo un error al generar el archivo XLSX.");
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // --- DASHBOARD LOGIC (Visualization) ---
+        let categoryChartInstance = null;
+        let brandChartInstance = null;
+
+        function updateDashboard() {
+            // Calculate Stats
+            const total = products.length;
+            const categories = [...new Set(products.map(p => p.category))];
+            const brands = [...new Set(products.map(p => p.brand))];
+
+            document.getElementById('kpi-total').innerText = total;
+            document.getElementById('kpi-categories').innerText = categories.length;
+            document.getElementById('kpi-brands').innerText = brands.length;
+
+            // Prepare Chart Data
+            const catCounts = {};
+            products.forEach(p => catCounts[p.category] = (catCounts[p.category] || 0) + 1);
+
+            const brandCounts = {};
+            products.forEach(p => {
+                if (p.brand !== 'Generica') brandCounts[p.brand] = (brandCounts[p.brand] || 0) + 1;
+            });
+            // Sort brands by count
+            const sortedBrands = Object.entries(brandCounts).sort((a,b) => b[1] - a[1]).slice(0, 10); // Top 10
+
+            // Render Charts
+            renderCategoryChart(catCounts);
+            renderBrandChart(sortedBrands);
+        }
+
+        function renderCategoryChart(data) {
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            if (categoryChartInstance) categoryChartInstance.destroy();
+
+            const labels = Object.keys(data).map(k => k.replace(/_/g, ' ').toUpperCase());
+            const values = Object.values(data);
+
+            categoryChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: ['#2563EB', '#3B82F6', '#60A5FA', '#93C5FD', '#BFDBFE', '#1E40AF'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+        }
+
+        function renderBrandChart(sortedData) {
+            const ctx = document.getElementById('brandChart').getContext('2d');
+            if (brandChartInstance) brandChartInstance.destroy();
+
+            brandChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedData.map(i => i[0]),
+                    datasets: [{
+                        label: 'Productos',
+                        data: sortedData.map(i => i[1]),
+                        backgroundColor: '#10B981',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // --- CATALOG LOGIC ---
+
+        // Setup Filter Buttons
+        function initFilters() {
+            const container = document.getElementById('categoryFilters');
+            const cats = ['todos', 'pest_control', 'home_cleaning', 'air_care', 'home_storage', 'npds', 'nuevos_productos', 'special packs'];
+
+            container.innerHTML = cats.map(cat => {
+                const label = cat === 'todos' ? 'Todos' : cat.replace(/_/g, ' ').toUpperCase();
+                return `<button onclick="filterProducts('${cat}')" class="filter-btn px-4 py-2 rounded-full text-sm font-semibold border border-gray-200 bg-white text-gray-600 hover:bg-blue-50 hover:border-blue-300 transition" data-cat="${cat}">${label}</button>`;
+            }).join('');
+
+            // Set initial active
+            filterProducts('todos');
+        }
+
+        function filterProducts(category) {
+            // UI Updates
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.className = "filter-btn px-4 py-2 rounded-full text-sm font-semibold border border-gray-200 bg-white text-gray-600 hover:bg-blue-50 hover:border-blue-300 transition";
+                if(btn.dataset.cat === category) btn.classList.add('bg-blue-600', 'text-white', 'border-blue-600', 'hover:bg-blue-700');
+                if(btn.dataset.cat === category) btn.classList.remove('bg-white', 'text-gray-600', 'hover:bg-blue-50');
+            });
+
+            // Subfilters Logic
+            const subFilters = document.getElementById('subFilters');
+            const brandContainer = document.getElementById('brandButtons');
+            brandContainer.innerHTML = '';
+
+            let brandsToShow = [];
+            if (category === 'pest_control') brandsToShow = ['Raid', 'Baygon', 'Off', 'Raidolito', "Laminitas", "Aparatos"];
+            else if (category === 'home_cleaning') brandsToShow = ['Pato', 'Pledge', 'Family Guard', 'Drano', 'Windex', 'Mr. Musculo'];
+            else if (category === 'air_care') brandsToShow = ['Glade'];
+            else if (category === 'home_storage') brandsToShow = ['Ziploc'];
+            else if (category === 'special packs') brandsToShow = ['special packs'];
+
+            if (brandsToShow.length > 0) {
+                subFilters.classList.remove('hidden');
+                subFilters.classList.add('flex');
+                brandContainer.innerHTML = brandsToShow.map(b =>
+                    `<button onclick="filterByBrand('${b}', '${category}')" class="brand-btn px-3 py-1 rounded-full text-xs border border-gray-300 bg-white text-gray-600 hover:border-blue-500 hover:text-blue-600 transition">${b}</button>`
+                ).join('');
+            } else {
+                subFilters.classList.add('hidden');
+                subFilters.classList.remove('flex');
+            }
+
+            // Data Filter
+            const filtered = category === 'todos' ? products : products.filter(p => p.category === category);
+            renderProducts(filtered);
+        }
+
+        function filterByBrand(brand, category) {
+            // UI Update for Brand Buttons
+            document.querySelectorAll('.brand-btn').forEach(btn => {
+                btn.className = "brand-btn px-3 py-1 rounded-full text-xs border border-gray-300 bg-white text-gray-600 hover:border-blue-500 hover:text-blue-600 transition";
+                if(btn.innerText === brand) btn.className = "brand-btn px-3 py-1 rounded-full text-xs border border-blue-600 bg-blue-50 text-blue-700 font-bold shadow-sm transition";
+            });
+
+            const filtered = products.filter(p => p.category === category && p.brand.toLowerCase().includes(brand.toLowerCase()));
+            renderProducts(filtered);
+        }
+
+        // Render Grid
+        function renderProducts(list) {
+            const grid = document.getElementById('productGrid');
+            const count = document.getElementById('productCount');
+            grid.innerHTML = '';
+            count.innerText = list.length;
+
+            list.forEach(p => {
+                let imgUrl = p.image;
+                if (!imgUrl || imgUrl === "") {
+                    imgUrl = "https://via.placeholder.com/400x400/f3f4f6/9ca3af?text=No+Image";
+                } else {
+                    imgUrl = formatImageUrl(imgUrl);
+                }
+
+                const card = `
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition cursor-pointer group flex flex-col overflow-hidden" onclick="openProductDetails(${p.id})">
+                        <div class="h-48 overflow-hidden bg-gray-50 relative">
+                            <img src="${imgUrl}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-500" onerror="this.src='https://via.placeholder.com/400?text=Error'">
+                            <span class="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider text-blue-600 shadow-sm border border-blue-100">${p.category.replace('_', ' ')}</span>
+                        </div>
+                        <div class="p-4 flex flex-col flex-grow">
+                            <div class="text-xs text-gray-400 font-semibold mb-1 uppercase">${p.brand}</div>
+                            <h3 class="font-bold text-gray-900 mb-2 leading-snug group-hover:text-blue-600 transition">${p.name}</h3>
+                            <div class="mt-auto flex items-center justify-between pt-3 border-t border-gray-50">
+                                <span class="text-xs text-blue-500 font-medium hover:underline">Ver ficha técnica</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                grid.innerHTML += card;
+            });
+        }
+
+        // --- UTILS & AI ---
+        function formatImageUrl(url) {
+            let finalUrl = url;
+            if (url && url.includes('drive.google.com') && url.includes('/file/d/')) {
+                const idMatch = url.match(/\/d\/(.*?)\//);
+                if (idMatch && idMatch[1]) finalUrl = `https://drive.google.com/uc?export=view&id=${idMatch[1]}`;
+            } else if (url && url.includes('dropbox.com')) {
+                finalUrl = url.replace('dl=0', 'raw=1');
+            }
+
+            // Use wsrv.nl to optimize image size and quality for external links
+            if (finalUrl && finalUrl.startsWith('http')) {
+                return `https://wsrv.nl/?url=${encodeURIComponent(finalUrl)}&w=300&q=50`;
+            }
+            return finalUrl;
+        }
+
+        // --- MODALS ---
+        function openProductDetails(id) {
+            const p = products.find(i => i.id === id);
+            if(!p) return;
+            document.getElementById('modalTitle').innerText = p.name;
+            document.getElementById('modalCategoryBadge').innerText = p.category.replace('_',' ');
+
+            let imgUrl = p.image || "https://via.placeholder.com/400?text=No+Image";
+            if (imgUrl.startsWith('http')) imgUrl = formatImageUrl(imgUrl);
+            document.getElementById('modalImg').src = imgUrl;
+
+            const specs = document.getElementById('modalSpecs');
+            specs.innerHTML = '';
+            if(p.specs && p.specs.length) {
+                p.specs.forEach(s => specs.innerHTML += `<li class="flex items-start gap-2"><span class="text-blue-400 mt-1">▪</span> ${s}</li>`);
+            } else {
+                specs.innerHTML = '<li class="text-gray-400 italic">No hay datos disponibles.</li>';
+            }
+            document.getElementById('productModal').classList.remove('hidden');
+        }
+
+        function closeProductModal() { document.getElementById('productModal').classList.add('hidden'); }
+
+        // Search Listener
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const matches = products.filter(p =>
+                p.name.toLowerCase().includes(term) ||
+                (p.specs && p.specs.some(s => s.toLowerCase().includes(term)))
+            );
+            renderProducts(matches);
+            if(term === '') filterProducts('todos');
+        });
+
+        // Init
+        document.getElementById('lastUpdateDisplay').innerText = appConfig.lastUpdate;
+        document.getElementById('currentYear').innerText = new Date().getFullYear();
+        initFilters();
+        switchView('dashboard'); // Default start view
+
+    </script>
+    <!-- CONFIRMATION: NO SVG graphics used (replaced with Unicode chars/CSS). NO Mermaid JS used. -->
+    <!-- Visualization & Content Choices:
+         - Dashboard: Chart.js for aggregation. Useful for managers.
+         - Grid: Standard HTML for item browsing.
+         - No SVG: Unicode chars used for icons (search, close, chat).
+         - Images: Handled with fallback and Google Drive formatter.
+    -->
+</body>
+</html>
