@@ -116,8 +116,8 @@
                 <p class="text-gray-600 mb-6">Ingrese la clave del producto y la cantidad de cajas para generar un listado de costos.</p>
                 <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 max-w-3xl mx-auto flex flex-col md:flex-row gap-4 items-end">
                     <div class="flex-grow w-full">
-                        <label class="block text-sm font-medium text-gray-700 text-left mb-1">Clave del Producto (Z, SCJ o UPC)</label>
-                        <input type="text" id="calc-clave" placeholder="Ej: 320001" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <label class="block text-sm font-medium text-gray-700 text-left mb-1">Clave o Descripción del Producto</label>
+                        <input type="text" id="calc-clave" placeholder="Ej: 320001 o RAID CASA" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div class="w-full md:w-1/3">
                         <label class="block text-sm font-medium text-gray-700 text-left mb-1">Cantidad de Cajas</label>
@@ -257,6 +257,9 @@
                 if (p.upc && p.upc.toLowerCase() === claveInput) {
                     product = p; matchedClave = 'UPC: ' + p.upc; break;
                 }
+                if (p.name && p.name.toLowerCase().includes(claveInput)) {
+                    product = p; matchedClave = p.clave_z ? 'Clave Z: ' + p.clave_z : p.name; break;
+                }
             }
 
             if (!product) {
@@ -340,11 +343,11 @@
             btn.innerHTML = '⏳ Generando...';
             btn.disabled = true;
 
-            const headers = ["Clave", "Nombre", "Precio Unitario", "Cajas", "Total"];
-            const data = calcItems.map(item => [item.clave, item.name, item.unitPrice, item.qty, item.total]);
+            const headers = ["Clave", "Clave SCJ", "Nombre", "Precio Unitario", "Cajas", "Total"];
+            const data = calcItems.map(item => [item.clave, "SCJ", item.name, item.unitPrice, item.qty, item.total]);
             const grandTotal = calcItems.reduce((sum, item) => sum + item.total, 0);
             data.push([]);
-            data.push(["", "", "", "Gran Total:", grandTotal]);
+            data.push(["", "", "", "", "Gran Total:", grandTotal]);
 
             const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
             const ws_range = XLSX.utils.decode_range(ws['!ref']);
@@ -355,8 +358,8 @@
                 }
             }
             const totalRow = data.length;
-            if (ws['E' + (totalRow + 1)]) ws['E' + (totalRow + 1)].s = { font: { bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "right" } };
-            if (ws['D' + (totalRow + 1)]) ws['D' + (totalRow + 1)].s = { font: { bold: true }, alignment: { horizontal: "right" } };
+            if (ws['F' + (totalRow + 1)]) ws['F' + (totalRow + 1)].s = { font: { bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "right" } };
+            if (ws['E' + (totalRow + 1)]) ws['E' + (totalRow + 1)].s = { font: { bold: true }, alignment: { horizontal: "right" } };
 
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Listado de Costos");
