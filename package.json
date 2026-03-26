@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "build": "node database/seed.js",
     "seed": "node database/seed.js"
   },
   "dependencies": {

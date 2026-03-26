@@ -2,7 +2,16 @@ require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
+const fs = require('fs');
 const Database = require('better-sqlite3');
+
+const { runSeed, DB_PATH } = require('./database/seed');
+
+// Auto-seed: create database if it doesn't exist (for Railway / fresh deploys)
+if (!fs.existsSync(DB_PATH)) {
+    console.log('Base de datos no encontrada. Ejecutando seed...');
+    runSeed();
+}
 
 const apiRoutes = require('./routes/api');
 const adminRoutes = require('./routes/admin');
@@ -11,7 +20,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Database
-const db = new Database(path.join(__dirname, 'database', 'catalog.db'));
+const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
 app.locals.db = db;
 
