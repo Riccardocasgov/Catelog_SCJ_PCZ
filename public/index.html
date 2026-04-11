@@ -272,6 +272,8 @@
 
             calcItems.push({
                 clave: matchedClave,
+                clave_z: product.clave_z,
+                clave_scj: product.clave_scj,
                 name: product.name,
                 unitPrice: unitPrice,
                 qty: qtyInput,
@@ -343,11 +345,24 @@
             btn.innerHTML = '⏳ Generando...';
             btn.disabled = true;
 
-            const headers = ["Clave", "Clave Z", "Clave SCJ", "Nombre", "Precio Unitario", "Cajas", "Total"];
-            const data = calcItems.map(item => [item.clave, item.clave, "SCJ", item.name, item.unitPrice, item.qty, item.total]);
+            const headers = ["Clave Z", "Clave SCJ", "Nombre", "Precio Unitario", "Cajas", "Total"];
+            const cleanNumber = (val) => {
+                if (!val) return "";
+                const parsed = parseInt(String(val).replace(/\D/g, ''), 10);
+                return isNaN(parsed) ? "" : parsed;
+            };
+
+            const data = calcItems.map(item => [
+                cleanNumber(item.clave_z || item.clave),
+                cleanNumber(item.clave_scj || "SCJ"),
+                item.name,
+                item.unitPrice,
+                item.qty,
+                item.total
+            ]);
             const grandTotal = calcItems.reduce((sum, item) => sum + item.total, 0);
             data.push([]);
-            data.push(["", "", "", "", "", "Gran Total:", grandTotal]);
+            data.push(["", "", "", "", "Gran Total:", grandTotal]);
 
             const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
             const ws_range = XLSX.utils.decode_range(ws['!ref']);
@@ -358,8 +373,8 @@
                 }
             }
             const totalRow = data.length;
-            if (ws['G' + (totalRow + 1)]) ws['G' + (totalRow + 1)].s = { font: { bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "right" } };
-            if (ws['F' + (totalRow + 1)]) ws['F' + (totalRow + 1)].s = { font: { bold: true }, alignment: { horizontal: "right" } };
+            if (ws['F' + (totalRow + 1)]) ws['F' + (totalRow + 1)].s = { font: { bold: true, color: { rgb: "0000FF" } }, alignment: { horizontal: "right" } };
+            if (ws['E' + (totalRow + 1)]) ws['E' + (totalRow + 1)].s = { font: { bold: true }, alignment: { horizontal: "right" } };
 
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Listado de Costos");
