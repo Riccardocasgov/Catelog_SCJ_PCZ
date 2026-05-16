@@ -568,16 +568,16 @@
             // Specs from structured fields
             const specs = document.getElementById('modalSpecs');
             specs.innerHTML = '';
-            const specItems = [
-                { label: 'Clave Z', value: p.clave_z },
-                { label: 'Clave SCJ', value: p.clave_scj },
-                { label: 'UPC', value: p.upc },
-                { label: 'Precio', value: p.price ? '$' + p.price.toFixed(2) : '' }
-            ];
+            const specItems = [];
+            // SKU codes only if show_codes is enabled for this product
+            if (p.show_codes) {
+                if (p.clave_z) specItems.push({ label: 'Clave Z', value: p.clave_z });
+                if (p.clave_scj) specItems.push({ label: 'Clave SCJ', value: p.clave_scj });
+                if (p.upc) specItems.push({ label: 'UPC', value: p.upc });
+            }
+            if (p.price) specItems.push({ label: 'Precio', value: '$' + p.price.toFixed(2) });
             specItems.forEach(s => {
-                if (s.value) {
-                    specs.innerHTML += `<li class="flex items-start gap-2"><span class="text-blue-400 mt-1">▪</span> <strong>${s.label}:</strong> ${s.value}</li>`;
-                }
+                specs.innerHTML += `<li class="flex items-start gap-2"><span class="text-blue-400 mt-1">▪</span> <strong>${s.label}:</strong> ${s.value}</li>`;
             });
             if (!specs.innerHTML) {
                 specs.innerHTML = '<li class="text-gray-400 italic">No hay datos disponibles.</li>';

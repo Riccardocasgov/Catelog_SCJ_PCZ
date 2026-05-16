@@ -25,7 +25,7 @@ router.get('/products', (req, res) => {
         params.push(term, term, term, term);
     }
 
-    sql += ' ORDER BY id ASC';
+    sql += ' ORDER BY display_order ASC, id ASC';
 
     const products = db.prepare(sql).all(...params);
     res.json(products);

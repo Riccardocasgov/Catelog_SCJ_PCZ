@@ -22,6 +22,19 @@ const PORT = process.env.PORT || 3000;
 // Database
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
+
+// Migration: ensure new columns exist on existing databases
+function ensureColumn(name, definition, initSql) {
+    const columns = db.prepare(`PRAGMA table_info(products)`).all();
+    if (!columns.some(c => c.name === name)) {
+        console.log(`Agregando columna "${name}" a la tabla products...`);
+        db.exec(`ALTER TABLE products ADD COLUMN ${name} ${definition}`);
+        if (initSql) db.exec(initSql);
+    }
+}
+ensureColumn('show_codes', 'INTEGER DEFAULT 1');
+ensureColumn('display_order', 'INTEGER DEFAULT 0', 'UPDATE products SET display_order = id WHERE display_order = 0');
+
 app.locals.db = db;
 
 // Middleware

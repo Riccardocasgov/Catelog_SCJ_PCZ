@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS products (
     clave_scj TEXT DEFAULT '',
     upc TEXT DEFAULT '',
     price REAL DEFAULT 0,
+    show_codes INTEGER DEFAULT 1,
+    display_order INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
