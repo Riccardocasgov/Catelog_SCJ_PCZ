@@ -113,9 +113,9 @@ router.put('/products/:id', requireAuth, (req, res) => {
         category ?? existing.category,
         brand ?? existing.brand,
         image ?? existing.image,
-        clave_z ?? existing.clave_z,
-        clave_scj ?? existing.clave_scj,
-        upc ?? existing.upc,
+        clave_z || existing.clave_z,
+        clave_scj || existing.clave_scj,
+        upc || existing.upc,
         price != null ? parseFloat(price) : existing.price,
         nextShowCodes,
         req.params.id
