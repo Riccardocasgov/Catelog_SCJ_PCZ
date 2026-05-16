@@ -98,7 +98,7 @@
                                     <th class="p-3">Clave Z</th>
                                     <th class="p-3">Clave SCJ</th>
                                     <th class="p-3">UPC</th>
-                                    <th class="p-3 text-center">SKUs</th>
+                                    <th class="p-3 text-center">Visible</th>
                                     <th class="p-3 text-right">Precio</th>
                                     <th class="p-3 text-center">Acciones</th>
                                 </tr>
@@ -216,7 +216,7 @@
                 <div class="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-lg p-3">
                     <input type="checkbox" id="form-show-codes" checked class="w-5 h-5 text-blue-600 focus:ring-blue-500 rounded">
                     <label for="form-show-codes" class="text-sm text-gray-700 cursor-pointer">
-                        Mostrar códigos SKU (Clave Z, SCJ, UPC) en el catálogo público
+                        Mostrar producto en el catálogo público (imagen, nombre, ficha técnica)
                     </label>
                 </div>
 
@@ -334,7 +334,7 @@
                 const showCodes = p.show_codes === undefined || p.show_codes === null ? 1 : p.show_codes;
                 const toggleIcon = showCodes ? '👁️' : '🚫';
                 const toggleClass = showCodes ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200';
-                const toggleTitle = showCodes ? 'Códigos visibles (clic para ocultar)' : 'Códigos ocultos (clic para mostrar)';
+                const toggleTitle = showCodes ? 'Producto visible en catálogo (clic para ocultar)' : 'Producto oculto del catálogo (clic para mostrar)';
                 return `
                 <tr class="hover:bg-gray-50 transition">
                     <td class="p-3 text-gray-500 text-xs">${p.id}</td>

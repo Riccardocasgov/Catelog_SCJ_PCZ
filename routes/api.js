@@ -6,7 +6,7 @@ router.get('/products', (req, res) => {
     const db = req.app.locals.db;
     const { category, brand, search } = req.query;
 
-    let sql = 'SELECT * FROM products WHERE 1=1';
+    let sql = 'SELECT * FROM products WHERE show_codes = 1';
     const params = [];
 
     if (category && category !== 'todos') {
@@ -34,7 +34,7 @@ router.get('/products', (req, res) => {
 // GET /api/products/:id - Single product
 router.get('/products/:id', (req, res) => {
     const db = req.app.locals.db;
-    const product = db.prepare('SELECT * FROM products WHERE id = ?').get(req.params.id);
+    const product = db.prepare('SELECT * FROM products WHERE id = ? AND show_codes = 1').get(req.params.id);
     if (!product) return res.status(404).json({ error: 'Producto no encontrado' });
     res.json(product);
 });
@@ -42,7 +42,7 @@ router.get('/products/:id', (req, res) => {
 // GET /api/categories - Distinct categories
 router.get('/categories', (req, res) => {
     const db = req.app.locals.db;
-    const rows = db.prepare("SELECT DISTINCT category FROM products WHERE category != '' ORDER BY category").all();
+    const rows = db.prepare("SELECT DISTINCT category FROM products WHERE category != '' AND show_codes = 1 ORDER BY category").all();
     res.json(rows.map(r => r.category));
 });
 
@@ -50,7 +50,7 @@ router.get('/categories', (req, res) => {
 router.get('/brands', (req, res) => {
     const db = req.app.locals.db;
     const { category } = req.query;
-    let sql = "SELECT DISTINCT brand FROM products WHERE brand != ''";
+    let sql = "SELECT DISTINCT brand FROM products WHERE brand != '' AND show_codes = 1";
     const params = [];
 
     if (category && category !== 'todos') {
