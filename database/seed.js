@@ -55,14 +55,14 @@ function runSeed() {
     const productRegex = /\{\s*id\s*:\s*(\d+)\s*,\s*name\s*:\s*"([^"]*?)"\s*,\s*category\s*:\s*"([^"]*?)"\s*,\s*(?:brand\s*:\s*"([^"]*?)"\s*,\s*)?image\s*:\s*"([^"]*?)"\s*,\s*specs\s*:\s*\[(.*?)\]\s*,\s*price\s*:\s*([\d.]+)/g;
 
     const insert = db.prepare(`
-        INSERT INTO products (name, description, category, brand, image, clave_z, clave_scj, upc, price)
-        VALUES (?, '', ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO products (name, description, category, brand, image, clave_z, clave_scj, upc, price, show_codes, display_order)
+        VALUES (?, '', ?, ?, ?, ?, ?, ?, ?, 1, ?)
     `);
 
     const insertMany = db.transaction((products) => {
-        for (const p of products) {
-            insert.run(p.name, p.category, p.brand, p.image, p.clave_z, p.clave_scj, p.upc, p.price);
-        }
+        products.forEach((p, idx) => {
+            insert.run(p.name, p.category, p.brand, p.image, p.clave_z, p.clave_scj, p.upc, p.price, idx + 1);
+        });
     });
 
     const products = [];
