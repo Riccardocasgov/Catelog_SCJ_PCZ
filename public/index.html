@@ -243,26 +243,8 @@
                     </div>
                 </div>
 
-                <!-- Product Summary Table -->
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse text-sm">
-                            <thead>
-                                <tr class="bg-gray-50 border-b border-gray-200">
-                                    <th class="p-3 font-semibold text-gray-700">Clave</th>
-                                    <th class="p-3 font-semibold text-gray-700">Producto</th>
-                                    <th class="p-3 font-semibold text-gray-700">Categoria</th>
-                                    <th class="p-3 font-semibold text-gray-700 text-center">Total</th>
-                                    <th class="p-3 font-semibold text-gray-700 text-center" id="ex-th-fmt-0"></th>
-                                    <th class="p-3 font-semibold text-gray-700 text-center" id="ex-th-fmt-1"></th>
-                                    <th class="p-3 font-semibold text-gray-700 text-center" id="ex-th-fmt-2"></th>
-                                    <th class="p-3 font-semibold text-gray-700 text-center" id="ex-th-fmt-3"></th>
-                                </tr>
-                            </thead>
-                            <tbody id="ex-table-body" class="divide-y divide-gray-100"></tbody>
-                        </table>
-                    </div>
-                </div>
+                <!-- Product Table by Formato -->
+                <div id="ex-tables-by-formato" class="space-y-4"></div>
 
                 <!-- Detail panel (shown when a product row is clicked) -->
                 <div id="ex-detail" class="hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
@@ -816,12 +798,8 @@
                 document.getElementById('ex-kpi-stores').innerText = '0';
                 document.getElementById('ex-kpi-coverage').innerText = '0%';
                 document.getElementById('ex-kpi-formats').innerText = '0';
-                for (let i = 0; i < 4; i++) {
-                    const th = document.getElementById('ex-th-fmt-' + i);
-                    if (th) { th.innerText = ''; th.style.display = 'none'; }
-                }
-                document.getElementById('ex-table-body').innerHTML =
-                    '<tr><td colspan="8" class="p-6 text-center text-gray-400 italic">Sin resultados con los filtros aplicados.</td></tr>';
+                document.getElementById('ex-tables-by-formato').innerHTML =
+                    '<div class="bg-white p-8 rounded-xl text-center text-gray-400 italic border border-gray-100">Sin resultados con los filtros aplicados.</div>';
                 return;
             }
             processExData(filtered, exBaseline.fileName);
@@ -873,15 +851,6 @@
             document.getElementById('ex-kpi-coverage').innerText = avgCoverage + '%';
             document.getElementById('ex-kpi-formats').innerText = formatos.length;
 
-            formatos.forEach((f, i) => {
-                const th = document.getElementById('ex-th-fmt-' + i);
-                if (th) th.innerText = f;
-            });
-            for (let i = formatos.length; i < 4; i++) {
-                const th = document.getElementById('ex-th-fmt-' + i);
-                if (th) th.style.display = 'none';
-            }
-
             renderExTable(productList);
         }
 
@@ -901,25 +870,81 @@
         }
 
         function renderExTable(list) {
-            const tbody = document.getElementById('ex-table-body');
+            const container = document.getElementById('ex-tables-by-formato');
             if (!list.length) {
-                tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-gray-400 italic">Sin resultados.</td></tr>';
+                container.innerHTML = '<div class="bg-white p-8 rounded-xl text-center text-gray-400 italic border border-gray-100">Sin resultados.</div>';
                 return;
             }
             const { formatos, storesByFormato, totalStores } = exData;
-            tbody.innerHTML = list.map(p => {
-                const totalPct = totalStores ? Math.round((p.stores.size / totalStores) * 100) : 0;
-                const fmtCells = formatos.map(f =>
-                    `<td class="p-3 text-center">${coverageBar(p.storesByFmt[f].size, storesByFormato[f].size)}</td>`
-                ).join('');
-                const emptyFmtCells = Array(Math.max(0, 4 - formatos.length)).fill('<td class="p-3" style="display:none"></td>').join('');
-                return `<tr class="hover:bg-blue-50 cursor-pointer transition" onclick="showExDetail('${p.clave}')">
-                    <td class="p-3 font-mono text-xs text-gray-500">${p.clave}</td>
-                    <td class="p-3 font-medium text-gray-900 max-w-[250px] truncate" title="${p.descArt}">${p.descArt}</td>
-                    <td class="p-3 text-xs text-gray-500">${(p.categoria || '').replace(/_/g, ' ')}</td>
-                    <td class="p-3 text-center"><span class="text-xs font-bold ${coverageColor(totalPct)}">${totalPct}%</span></td>
-                    ${fmtCells}${emptyFmtCells}
-                </tr>`;
+
+            container.innerHTML = formatos.map(fmt => {
+                const fmtStores = [...storesByFormato[fmt]];
+                const fmtProducts = list.filter(p => p.storesByFmt[fmt].size > 0);
+                const avgCoverage = fmtProducts.length ? Math.round(
+                    fmtProducts.reduce((sum, p) => sum + (p.storesByFmt[fmt].size / fmtStores.length), 0) / fmtProducts.length * 100
+                ) : 0;
+
+                const bgColors = {
+                    'MAYOREO': 'from-blue-50 to-blue-100',
+                    'AUTOSERVICIO': 'from-emerald-50 to-emerald-100',
+                    'CASH AND CARRY': 'from-amber-50 to-amber-100',
+                    'MOSTRADORES': 'from-rose-50 to-rose-100'
+                };
+                const textColors = {
+                    'MAYOREO': 'text-blue-900',
+                    'AUTOSERVICIO': 'text-emerald-900',
+                    'CASH AND CARRY': 'text-amber-900',
+                    'MOSTRADORES': 'text-rose-900'
+                };
+                const borderColors = {
+                    'MAYOREO': 'border-blue-200',
+                    'AUTOSERVICIO': 'border-emerald-200',
+                    'CASH AND CARRY': 'border-amber-200',
+                    'MOSTRADORES': 'border-rose-200'
+                };
+                const bg = bgColors[fmt] || 'from-gray-50 to-gray-100';
+                const txtColor = textColors[fmt] || 'text-gray-900';
+                const brColor = borderColors[fmt] || 'border-gray-200';
+
+                const rows = fmtProducts.map(p => {
+                    const pct = fmtStores.length ? Math.round((p.storesByFmt[fmt].size / fmtStores.length) * 100) : 0;
+                    return `<tr class="border-t border-gray-100 hover:bg-gray-50 cursor-pointer transition" onclick="showExDetail('${p.clave}')">
+                        <td class="p-3 font-mono text-xs text-gray-500">${p.clave}</td>
+                        <td class="p-3 font-medium text-gray-900 max-w-xs truncate" title="${p.descArt}">${p.descArt}</td>
+                        <td class="p-3 text-xs text-gray-500">${(p.categoria || '').replace(/_/g, ' ')}</td>
+                        <td class="p-3">${coverageBar(p.storesByFmt[fmt].size, fmtStores.length)}</td>
+                    </tr>`;
+                }).join('');
+
+                return `<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="bg-gradient-to-r ${bg} border-b ${brColor} px-4 py-4">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h3 class="font-bold ${txtColor} text-lg">${fmt}</h3>
+                                <p class="text-sm text-gray-600 mt-1">${fmtStores.length} tienda${fmtStores.length !== 1 ? 's' : ''} en catálogo</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm font-bold text-gray-800">${avgCoverage}%</div>
+                                <p class="text-xs text-gray-600">cobertura promedio</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="bg-gray-50 border-b border-gray-200">
+                                    <th class="p-3 text-left font-semibold text-gray-700">Clave</th>
+                                    <th class="p-3 text-left font-semibold text-gray-700">Producto</th>
+                                    <th class="p-3 text-left font-semibold text-gray-700">Categoría</th>
+                                    <th class="p-3 text-left font-semibold text-gray-700">Cobertura</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows || '<tr><td colspan="4" class="p-6 text-center text-gray-400 italic">Sin productos en este formato.</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>`;
             }).join('');
         }
 
@@ -984,10 +1009,6 @@
                 if (sel) sel.innerHTML = '<option value="">Todos</option>';
             });
             document.getElementById('ex-search').value = '';
-            for (let i = 0; i < 4; i++) {
-                const th = document.getElementById('ex-th-fmt-' + i);
-                if (th) { th.innerText = ''; th.style.display = ''; }
-            }
         }
 
         // Start
