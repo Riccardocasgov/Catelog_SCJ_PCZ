@@ -41,6 +41,7 @@
                     <button onclick="switchView('dashboard')" id="nav-dashboard" class="px-3 py-2 font-medium text-gray-500 hover:text-blue-600 transition nav-active">Dashboard</button>
                     <button onclick="switchView('catalog')" id="nav-catalog" class="px-3 py-2 font-medium text-gray-500 hover:text-blue-600 transition">Explorar Productos</button>
                     <button onclick="switchView('calculator')" id="nav-calculator" class="px-3 py-2 font-medium text-gray-500 hover:text-blue-600 transition">Calculadora de Costos</button>
+                    <button onclick="switchView('existencia')" id="nav-existencia" class="px-3 py-2 font-medium text-gray-500 hover:text-blue-600 transition">Existencia</button>
                     <a href="/admin.html" class="ml-4 px-3 py-1.5 text-xs font-semibold text-gray-400 border border-gray-200 rounded-lg hover:text-blue-600 hover:border-blue-300 transition">Admin</a>
                 </nav>
             </div>
@@ -161,6 +162,93 @@
             </div>
         </section>
 
+        <!-- VIEW 4: EXISTENCIA EN TIENDA -->
+        <section id="view-existencia" class="fade-in space-y-6 hidden">
+            <!-- Upload Zone -->
+            <div id="ex-upload-zone" class="bg-white p-8 rounded-2xl shadow-sm border-2 border-dashed border-gray-300 text-center hover:border-blue-400 transition cursor-pointer"
+                 ondragover="event.preventDefault(); this.classList.add('border-blue-500','bg-blue-50')"
+                 ondragleave="this.classList.remove('border-blue-500','bg-blue-50')"
+                 ondrop="event.preventDefault(); this.classList.remove('border-blue-500','bg-blue-50'); handleExFile(event.dataTransfer.files[0])"
+                 onclick="document.getElementById('ex-file-input').click()">
+                <input type="file" id="ex-file-input" accept=".csv" class="hidden" onchange="handleExFile(this.files[0])">
+                <div class="text-5xl mb-3">📂</div>
+                <h2 class="text-xl font-bold text-gray-800 mb-1">Cargar Reporte de Existencia</h2>
+                <p class="text-sm text-gray-500">Arrastra tu archivo CSV o haz clic para seleccionarlo</p>
+                <p class="text-xs text-gray-400 mt-2">Formato esperado: ReporteEXISTENCIA con columnas FORMATO, CEDIS, CVE_ALM, DESCRI, CLAVE, DESC_ART, CATEGORIA</p>
+            </div>
+
+            <!-- Results (hidden until file loaded) -->
+            <div id="ex-results" class="hidden space-y-6">
+                <!-- File info bar -->
+                <div class="flex items-center justify-between bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+                    <div class="flex items-center gap-3">
+                        <span class="text-green-500 text-lg">&#10003;</span>
+                        <span id="ex-file-name" class="text-sm font-medium text-gray-700"></span>
+                        <span id="ex-file-rows" class="text-xs text-gray-400"></span>
+                    </div>
+                    <button onclick="resetExistencia()" class="text-xs text-red-500 hover:text-red-700 font-medium">Cargar otro archivo</button>
+                </div>
+
+                <!-- KPI Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                        <div class="text-blue-600 text-xs font-bold uppercase">SKUs</div>
+                        <div class="text-2xl font-bold text-gray-900" id="ex-kpi-skus">0</div>
+                    </div>
+                    <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                        <div class="text-indigo-600 text-xs font-bold uppercase">Tiendas</div>
+                        <div class="text-2xl font-bold text-gray-900" id="ex-kpi-stores">0</div>
+                    </div>
+                    <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                        <div class="text-emerald-600 text-xs font-bold uppercase">Cobertura Prom.</div>
+                        <div class="text-2xl font-bold text-gray-900" id="ex-kpi-coverage">0%</div>
+                    </div>
+                    <div class="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                        <div class="text-amber-600 text-xs font-bold uppercase">Formatos</div>
+                        <div class="text-2xl font-bold text-gray-900" id="ex-kpi-formats">0</div>
+                    </div>
+                </div>
+
+                <!-- Search -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                    <input type="text" id="ex-search" placeholder="Buscar por clave o nombre de producto..." class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" oninput="filterExTable()">
+                </div>
+
+                <!-- Product Summary Table -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead>
+                                <tr class="bg-gray-50 border-b border-gray-200">
+                                    <th class="p-3 font-semibold text-gray-700">Clave</th>
+                                    <th class="p-3 font-semibold text-gray-700">Producto</th>
+                                    <th class="p-3 font-semibold text-gray-700">Categoria</th>
+                                    <th class="p-3 font-semibold text-gray-700 text-center">Total</th>
+                                    <th class="p-3 font-semibold text-gray-700 text-center" id="ex-th-fmt-0"></th>
+                                    <th class="p-3 font-semibold text-gray-700 text-center" id="ex-th-fmt-1"></th>
+                                    <th class="p-3 font-semibold text-gray-700 text-center" id="ex-th-fmt-2"></th>
+                                    <th class="p-3 font-semibold text-gray-700 text-center" id="ex-th-fmt-3"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="ex-table-body" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Detail panel (shown when a product row is clicked) -->
+                <div id="ex-detail" class="hidden bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 id="ex-detail-title" class="text-lg font-bold text-gray-900"></h3>
+                            <p id="ex-detail-subtitle" class="text-xs text-gray-500"></p>
+                        </div>
+                        <button onclick="document.getElementById('ex-detail').classList.add('hidden')" class="text-gray-400 hover:text-red-500 text-xl">&times;</button>
+                    </div>
+                    <div id="ex-detail-body" class="space-y-3"></div>
+                </div>
+            </div>
+        </section>
+
     </main>
 
     <!-- Modal Details -->
@@ -221,12 +309,10 @@
 
         // --- NAVIGATION ---
         function switchView(viewName) {
-            document.getElementById('view-dashboard').classList.add('hidden');
-            document.getElementById('view-catalog').classList.add('hidden');
-            document.getElementById('view-calculator').classList.add('hidden');
-            document.getElementById('nav-dashboard').classList.remove('nav-active');
-            document.getElementById('nav-catalog').classList.remove('nav-active');
-            document.getElementById('nav-calculator').classList.remove('nav-active');
+            ['dashboard','catalog','calculator','existencia'].forEach(v => {
+                document.getElementById('view-' + v).classList.add('hidden');
+                document.getElementById('nav-' + v).classList.remove('nav-active');
+            });
 
             document.getElementById(`view-${viewName}`).classList.remove('hidden');
             document.getElementById(`nav-${viewName}`).classList.add('nav-active');
@@ -588,6 +674,202 @@
             );
             renderProducts(matches);
         });
+
+        // --- EXISTENCIA EN TIENDA ---
+        let exData = null; // parsed CSV data
+
+        function handleExFile(file) {
+            if (!file || !file.name.toLowerCase().endsWith('.csv')) {
+                alert('Por favor selecciona un archivo CSV.');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+                if (lines.length < 2) { alert('El archivo está vacío.'); return; }
+
+                const headers = lines[0].split(',');
+                const iFormato = headers.indexOf('FORMATO');
+                const iCedis = headers.indexOf('CEDIS');
+                const iAlm = headers.indexOf('CVE_ALM');
+                const iDescri = headers.indexOf('DESCRI');
+                const iClave = headers.indexOf('CLAVE');
+                const iDescArt = headers.indexOf('DESC_ART');
+                const iCategoria = headers.indexOf('CATEGORIA');
+
+                if (iFormato < 0 || iClave < 0 || iDescArt < 0) {
+                    alert('El CSV no tiene las columnas esperadas (FORMATO, CLAVE, DESC_ART).');
+                    return;
+                }
+
+                const rows = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = lines[i].split(',');
+                    if (cols.length < headers.length) continue;
+                    rows.push({
+                        formato: (cols[iFormato] || '').trim(),
+                        cedis: (cols[iCedis] || '').trim(),
+                        cveAlm: (cols[iAlm] || '').trim(),
+                        descri: (cols[iDescri] || '').trim(),
+                        clave: (cols[iClave] || '').trim(),
+                        descArt: (cols[iDescArt] || '').trim(),
+                        categoria: (cols[iCategoria] || '').trim()
+                    });
+                }
+
+                processExData(rows, file.name);
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function processExData(rows, fileName) {
+            const formatos = [...new Set(rows.map(r => r.formato))].sort();
+            const storeSet = {};
+            rows.forEach(r => { storeSet[r.cveAlm] = { descri: r.descri, cedis: r.cedis, formato: r.formato }; });
+            const totalStores = Object.keys(storeSet).length;
+
+            const storesByFormato = {};
+            formatos.forEach(f => storesByFormato[f] = new Set());
+            rows.forEach(r => storesByFormato[r.formato].add(r.cveAlm));
+
+            const productMap = {};
+            rows.forEach(r => {
+                if (!productMap[r.clave]) {
+                    productMap[r.clave] = { clave: r.clave, descArt: r.descArt, categoria: r.categoria, stores: new Set(), storesByFmt: {} };
+                    formatos.forEach(f => productMap[r.clave].storesByFmt[f] = new Set());
+                }
+                productMap[r.clave].stores.add(r.cveAlm);
+                productMap[r.clave].storesByFmt[r.formato].add(r.cveAlm);
+            });
+
+            const productList = Object.values(productMap).sort((a, b) => a.descArt.localeCompare(b.descArt));
+
+            let totalCoverage = 0;
+            productList.forEach(p => totalCoverage += p.stores.size / totalStores);
+            const avgCoverage = productList.length ? Math.round((totalCoverage / productList.length) * 100) : 0;
+
+            exData = { rows, formatos, storeSet, storesByFormato, totalStores, productList, fileName };
+
+            document.getElementById('ex-upload-zone').classList.add('hidden');
+            document.getElementById('ex-results').classList.remove('hidden');
+            document.getElementById('ex-file-name').innerText = fileName;
+            document.getElementById('ex-file-rows').innerText = `(${rows.length.toLocaleString()} registros)`;
+            document.getElementById('ex-kpi-skus').innerText = productList.length;
+            document.getElementById('ex-kpi-stores').innerText = totalStores;
+            document.getElementById('ex-kpi-coverage').innerText = avgCoverage + '%';
+            document.getElementById('ex-kpi-formats').innerText = formatos.length;
+
+            formatos.forEach((f, i) => {
+                const th = document.getElementById('ex-th-fmt-' + i);
+                if (th) th.innerText = f;
+            });
+            for (let i = formatos.length; i < 4; i++) {
+                const th = document.getElementById('ex-th-fmt-' + i);
+                if (th) th.style.display = 'none';
+            }
+
+            renderExTable(productList);
+        }
+
+        function coverageColor(pct) {
+            if (pct >= 70) return 'text-emerald-600';
+            if (pct >= 30) return 'text-amber-600';
+            return 'text-red-500';
+        }
+
+        function coverageBar(count, total) {
+            const pct = total ? Math.round((count / total) * 100) : 0;
+            const bg = pct >= 70 ? 'bg-emerald-400' : pct >= 30 ? 'bg-amber-400' : 'bg-red-400';
+            return `<div class="flex items-center gap-1.5">
+                <div class="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden"><div class="${bg} h-full rounded-full" style="width:${pct}%"></div></div>
+                <span class="text-xs ${coverageColor(pct)} font-semibold">${count}/${total}</span>
+            </div>`;
+        }
+
+        function renderExTable(list) {
+            const tbody = document.getElementById('ex-table-body');
+            if (!list.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-gray-400 italic">Sin resultados.</td></tr>';
+                return;
+            }
+            const { formatos, storesByFormato, totalStores } = exData;
+            tbody.innerHTML = list.map(p => {
+                const totalPct = totalStores ? Math.round((p.stores.size / totalStores) * 100) : 0;
+                const fmtCells = formatos.map(f =>
+                    `<td class="p-3 text-center">${coverageBar(p.storesByFmt[f].size, storesByFormato[f].size)}</td>`
+                ).join('');
+                const emptyFmtCells = Array(Math.max(0, 4 - formatos.length)).fill('<td class="p-3" style="display:none"></td>').join('');
+                return `<tr class="hover:bg-blue-50 cursor-pointer transition" onclick="showExDetail('${p.clave}')">
+                    <td class="p-3 font-mono text-xs text-gray-500">${p.clave}</td>
+                    <td class="p-3 font-medium text-gray-900 max-w-[250px] truncate" title="${p.descArt}">${p.descArt}</td>
+                    <td class="p-3 text-xs text-gray-500">${(p.categoria || '').replace(/_/g, ' ')}</td>
+                    <td class="p-3 text-center"><span class="text-xs font-bold ${coverageColor(totalPct)}">${totalPct}%</span></td>
+                    ${fmtCells}${emptyFmtCells}
+                </tr>`;
+            }).join('');
+        }
+
+        function filterExTable() {
+            if (!exData) return;
+            const term = document.getElementById('ex-search').value.trim().toLowerCase();
+            const filtered = term
+                ? exData.productList.filter(p => p.clave.toLowerCase().includes(term) || p.descArt.toLowerCase().includes(term))
+                : exData.productList;
+            renderExTable(filtered);
+        }
+
+        function showExDetail(clave) {
+            if (!exData) return;
+            const product = exData.productList.find(p => p.clave === clave);
+            if (!product) return;
+            const { formatos, storesByFormato, storeSet, totalStores } = exData;
+
+            document.getElementById('ex-detail-title').innerText = `${product.clave} — ${product.descArt}`;
+            const totalPct = totalStores ? Math.round((product.stores.size / totalStores) * 100) : 0;
+            document.getElementById('ex-detail-subtitle').innerText = `${product.categoria}  |  Cobertura total: ${product.stores.size}/${totalStores} (${totalPct}%)`;
+
+            const body = document.getElementById('ex-detail-body');
+            body.innerHTML = formatos.map(fmt => {
+                const fmtStores = [...storesByFormato[fmt]];
+                const present = fmtStores.filter(s => product.storesByFmt[fmt].has(s));
+                const absent = fmtStores.filter(s => !product.storesByFmt[fmt].has(s));
+                const fmtPct = fmtStores.length ? Math.round((present.length / fmtStores.length) * 100) : 0;
+                const barColor = fmtPct >= 70 ? 'bg-emerald-400' : fmtPct >= 30 ? 'bg-amber-400' : 'bg-red-400';
+
+                const storeRows = [
+                    ...present.map(s => `<div class="flex items-center gap-2 py-1 px-2"><span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span><span class="text-sm text-gray-700">${storeSet[s].descri}</span><span class="text-xs text-gray-400 ml-auto">${storeSet[s].cedis}</span></div>`),
+                    ...absent.map(s => `<div class="flex items-center gap-2 py-1 px-2"><span class="w-2 h-2 rounded-full bg-gray-300 shrink-0"></span><span class="text-sm text-gray-400">${storeSet[s].descri}</span><span class="text-xs text-gray-300 ml-auto">${storeSet[s].cedis}</span></div>`)
+                ].join('');
+
+                return `<details class="border border-gray-200 rounded-xl overflow-hidden">
+                    <summary class="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 cursor-pointer transition">
+                        <span class="font-semibold text-gray-800">${fmt}</span>
+                        <div class="flex items-center gap-3">
+                            <div class="w-24 h-2 bg-gray-200 rounded-full overflow-hidden"><div class="${barColor} h-full rounded-full" style="width:${fmtPct}%"></div></div>
+                            <span class="text-sm font-bold ${coverageColor(fmtPct)}">${present.length}/${fmtStores.length} <span class="font-normal text-gray-400">(${fmtPct}%)</span></span>
+                        </div>
+                    </summary>
+                    <div class="p-3 max-h-64 overflow-y-auto divide-y divide-gray-50">${storeRows}</div>
+                </details>`;
+            }).join('');
+
+            const detail = document.getElementById('ex-detail');
+            detail.classList.remove('hidden');
+            detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function resetExistencia() {
+            exData = null;
+            document.getElementById('ex-results').classList.add('hidden');
+            document.getElementById('ex-upload-zone').classList.remove('hidden');
+            document.getElementById('ex-detail').classList.add('hidden');
+            document.getElementById('ex-file-input').value = '';
+            for (let i = 0; i < 4; i++) {
+                const th = document.getElementById('ex-th-fmt-' + i);
+                if (th) { th.innerText = ''; th.style.display = ''; }
+            }
+        }
 
         // Start
         init();
