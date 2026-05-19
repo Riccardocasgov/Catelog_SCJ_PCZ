@@ -287,6 +287,8 @@
 
     <script>
         const appConfig = { lastUpdate: "9 de Marzo de 2026" };
+        const EX_STORAGE_KEY = 'pcz-existencia-data';
+        const EX_STORAGE_VERSION = 1;
 
         let products = [];
         let calcItems = [];
@@ -318,6 +320,7 @@
             document.getElementById(`nav-${viewName}`).classList.add('nav-active');
 
             if (viewName === 'dashboard') updateDashboard();
+            if (viewName === 'existencia' && !exData) tryRestoreExSession();
         }
 
         // --- CALCULATOR ---
@@ -719,8 +722,41 @@
                 }
 
                 processExData(rows, file.name);
+                saveExSession(rows, file.name);
             };
             reader.readAsText(file, 'UTF-8');
+        }
+
+        function saveExSession(rows, fileName) {
+            try {
+                sessionStorage.setItem(EX_STORAGE_KEY, JSON.stringify({
+                    v: EX_STORAGE_VERSION,
+                    rows,
+                    fileName,
+                    savedAt: Date.now()
+                }));
+            } catch (e) {
+                console.warn('No se pudo guardar la sesión de existencia:', e);
+            }
+        }
+
+        function tryRestoreExSession() {
+            try {
+                const raw = sessionStorage.getItem(EX_STORAGE_KEY);
+                if (!raw) return false;
+                const parsed = JSON.parse(raw);
+                if (parsed.v !== EX_STORAGE_VERSION) {
+                    sessionStorage.removeItem(EX_STORAGE_KEY);
+                    return false;
+                }
+                if (!parsed.rows || !parsed.rows.length) return false;
+                processExData(parsed.rows, parsed.fileName);
+                return true;
+            } catch (e) {
+                console.warn('Sesión de existencia corrupta, limpiando:', e);
+                try { sessionStorage.removeItem(EX_STORAGE_KEY); } catch (_) {}
+                return false;
+            }
         }
 
         function processExData(rows, fileName) {
@@ -861,6 +897,7 @@
 
         function resetExistencia() {
             exData = null;
+            try { sessionStorage.removeItem(EX_STORAGE_KEY); } catch (e) {}
             document.getElementById('ex-results').classList.add('hidden');
             document.getElementById('ex-upload-zone').classList.remove('hidden');
             document.getElementById('ex-detail').classList.add('hidden');
