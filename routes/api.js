@@ -63,4 +63,25 @@ router.get('/brands', (req, res) => {
     res.json(rows.map(r => r.brand));
 });
 
+// GET /api/existencia - Retrieve stored inventory data
+router.get('/existencia', (req, res) => {
+    const db = req.app.locals.db;
+    const row = db.prepare('SELECT data, file_name, uploaded_at FROM existencia_cache WHERE id = 1').get();
+    if (!row) return res.json({ exists: false });
+    res.json({ exists: true, rows: JSON.parse(row.data), fileName: row.file_name, uploadedAt: row.uploaded_at });
+});
+
+// POST /api/existencia - Store inventory data from CSV
+router.post('/existencia', (req, res) => {
+    const db = req.app.locals.db;
+    const { rows, fileName } = req.body;
+    if (!rows || !rows.length) return res.status(400).json({ error: 'No hay datos' });
+
+    db.prepare(`INSERT OR REPLACE INTO existencia_cache (id, data, file_name, uploaded_at)
+                VALUES (1, ?, ?, datetime('now'))`)
+      .run(JSON.stringify(rows), fileName || 'unknown.csv');
+
+    res.json({ message: 'Datos guardados', count: rows.length });
+});
+
 module.exports = router;
