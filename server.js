@@ -35,10 +35,17 @@ function ensureColumn(name, definition, initSql) {
 ensureColumn('show_codes', 'INTEGER DEFAULT 1');
 ensureColumn('display_order', 'INTEGER DEFAULT 0', 'UPDATE products SET display_order = id WHERE display_order = 0');
 
+db.exec(`CREATE TABLE IF NOT EXISTS existencia_cache (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    data TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    uploaded_at TEXT DEFAULT (datetime('now'))
+)`);
+
 app.locals.db = db;
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
     secret: process.env.SESSION_SECRET || 'default-secret-change-me',
