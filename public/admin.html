@@ -10,6 +10,10 @@
         body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .safe-bottom { padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+        @media (max-width: 640px) {
+            #formModal > div { border-radius: 1rem 1rem 0 0; }
+        }
     </style>
 </head>
 <body class="text-gray-800 min-h-screen flex flex-col">
@@ -138,30 +142,56 @@
         </section>
     </main>
 
-    <!-- PRODUCT FORM MODAL -->
-    <div id="formModal" class="fixed inset-0 bg-black/50 z-[90] hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div class="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
-                <h3 id="form-title" class="text-xl font-bold text-gray-900">Nuevo Producto</h3>
-                <button onclick="closeForm()" class="text-gray-400 hover:text-red-500 text-2xl leading-none">×</button>
+    <!-- PRODUCT FORM MODAL — Mobile-first wizard with thumb-zone CTAs -->
+    <div id="formModal" class="fixed inset-0 bg-black/50 z-[90] hidden backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4">
+        <div class="bg-white w-full sm:max-w-2xl sm:rounded-2xl shadow-2xl flex flex-col h-[95vh] sm:h-auto sm:max-h-[90vh]">
+            <!-- Header with step progress -->
+            <div class="px-4 py-3 sm:p-5 border-b border-gray-100 bg-white">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 id="form-title" class="text-lg sm:text-xl font-bold text-gray-900">Nuevo Producto</h3>
+                    <button onclick="closeForm()" class="text-gray-400 hover:text-red-500 text-3xl leading-none w-10 h-10 flex items-center justify-center -mr-2">×</button>
+                </div>
+                <!-- Step progress bars -->
+                <div class="flex items-center gap-1.5">
+                    <div id="step-bar-1" class="step-bar flex-1 h-1.5 rounded-full bg-blue-600 transition-colors"></div>
+                    <div id="step-bar-2" class="step-bar flex-1 h-1.5 rounded-full bg-gray-200 transition-colors"></div>
+                    <div id="step-bar-3" class="step-bar flex-1 h-1.5 rounded-full bg-gray-200 transition-colors"></div>
+                </div>
+                <p id="step-label" class="text-xs text-gray-500 mt-2 font-medium">Paso 1 de 3 · Información Básica</p>
             </div>
-            <div class="p-6 space-y-4">
-                <input type="hidden" id="form-id">
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
-                    <input type="text" id="form-name" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nombre del producto">
+            <!-- Draft Restoration Banner -->
+            <div id="draft-banner" class="hidden bg-amber-50 border-b border-amber-200 px-4 py-3 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2 min-w-0">
+                    <span class="text-lg flex-shrink-0">📝</span>
+                    <span class="text-sm text-amber-800 truncate">Tienes un borrador sin guardar</span>
                 </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-                    <textarea id="form-description" rows="3" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Descripción detallada del producto..."></textarea>
+                <div class="flex gap-2 flex-shrink-0">
+                    <button onclick="discardDraft()" class="px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 rounded transition">Descartar</button>
+                    <button onclick="restoreDraft()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded transition">Restaurar</button>
                 </div>
+            </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input type="hidden" id="form-id">
+
+            <!-- Scrollable content area -->
+            <div id="form-content-scroll" class="flex-1 overflow-y-auto p-4 sm:p-6">
+
+                <!-- STEP 1: Información Básica -->
+                <div id="form-step-1" class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
-                        <select id="form-category" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Nombre del producto *</label>
+                        <input type="text" id="form-name" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base" placeholder="Ej: Raid Casa y Jardín 400ml">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Descripción</label>
+                        <textarea id="form-description" rows="4" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base" placeholder="Detalles del producto, presentación, usos..."></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Categoría</label>
+                        <select id="form-category" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-base">
                             <option value="">Seleccionar...</option>
                             <option value="pest_control">Control de Plagas</option>
                             <option value="home_cleaning">Limpieza del Hogar</option>
@@ -172,60 +202,105 @@
                             <option value="special packs">Special Packs</option>
                         </select>
                     </div>
+
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Marca</label>
-                        <input type="text" id="form-brand" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ej: Raid, Glade...">
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Marca</label>
+                        <input type="text" id="form-brand" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base" placeholder="Ej: Raid, Glade, Pledge...">
                     </div>
                 </div>
 
-                <!-- Image -->
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Imagen</label>
-                    <div class="flex gap-2">
-                        <input type="text" id="form-image" class="flex-grow px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="URL de la imagen o suba un archivo">
-                        <label class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg cursor-pointer transition text-sm font-medium flex items-center">
-                            Subir
-                            <input type="file" id="form-image-file" accept="image/*" class="hidden" onchange="uploadImage(this)">
+                <!-- STEP 2: Imagen -->
+                <div id="form-step-2" class="hidden space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Imagen del producto</label>
+
+                        <!-- Drop zone with instant preview -->
+                        <div id="image-dropzone" onclick="document.getElementById('form-image-file').click()"
+                             ondragover="event.preventDefault(); this.classList.add('border-blue-500','bg-blue-50')"
+                             ondragleave="this.classList.remove('border-blue-500','bg-blue-50')"
+                             ondrop="event.preventDefault(); this.classList.remove('border-blue-500','bg-blue-50'); handleImageFile(event.dataTransfer.files[0])"
+                             class="border-2 border-dashed border-gray-300 rounded-2xl p-6 sm:p-8 text-center hover:border-blue-400 transition cursor-pointer">
+
+                            <div id="dropzone-empty">
+                                <div class="text-5xl sm:text-6xl mb-3">📷</div>
+                                <p class="text-base font-semibold text-gray-700 mb-1">Toca para tomar foto o subir</p>
+                                <p class="text-xs text-gray-500">JPG, PNG, WebP · máx 5MB</p>
+                            </div>
+
+                            <div id="dropzone-preview" class="hidden">
+                                <img id="preview-img" class="max-h-56 sm:max-h-72 mx-auto rounded-xl shadow-sm" alt="Vista previa">
+                                <div id="upload-progress" class="hidden mt-3">
+                                    <div class="bg-gray-200 rounded-full h-2 overflow-hidden max-w-xs mx-auto">
+                                        <div id="upload-progress-bar" class="bg-blue-600 h-full transition-all" style="width: 40%"></div>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1">Subiendo al servidor...</p>
+                                </div>
+                            </div>
+
+                            <input type="file" id="form-image-file" accept="image/*" capture="environment" class="hidden" onchange="handleImageFile(this.files[0])">
+                        </div>
+
+                        <!-- Actions when image is loaded -->
+                        <div id="image-actions" class="hidden mt-3 flex gap-3 justify-center">
+                            <button type="button" onclick="document.getElementById('form-image-file').click()" class="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition">↻ Cambiar</button>
+                            <button type="button" onclick="removeImage()" class="px-4 py-2 text-sm font-medium text-red-500 hover:bg-red-50 rounded-lg transition">🗑️ Quitar</button>
+                        </div>
+                    </div>
+
+                    <!-- URL fallback (collapsible) -->
+                    <details class="text-sm">
+                        <summary class="text-gray-500 cursor-pointer hover:text-blue-600 py-2 select-none">O pegar URL de imagen externa</summary>
+                        <input type="text" id="form-image" class="mt-2 w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base" placeholder="https://...">
+                    </details>
+                </div>
+
+                <!-- STEP 3: Códigos & Precio -->
+                <div id="form-step-3" class="hidden space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Clave Z</label>
+                        <input type="text" id="form-clave-z" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base font-mono" placeholder="Código alfanumérico interno">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Clave SCJ</label>
+                        <input type="text" id="form-clave-scj" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base font-mono" placeholder="Código SCJ">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">UPC (Código de barras)</label>
+                        <input type="text" inputmode="numeric" id="form-upc" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base font-mono" placeholder="Solo números">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Precio (MXN)</label>
+                        <input type="number" inputmode="decimal" step="0.01" id="form-price" class="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base" placeholder="0.00">
+                    </div>
+
+                    <div class="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl p-4">
+                        <input type="checkbox" id="form-show-codes" checked class="w-5 h-5 text-blue-600 focus:ring-blue-500 rounded mt-0.5 flex-shrink-0">
+                        <label for="form-show-codes" class="text-sm text-gray-700 cursor-pointer leading-relaxed">
+                            <strong>Mostrar en catálogo público</strong><br>
+                            <span class="text-gray-500 text-xs">Si lo desactivas, el producto se ocultará del catálogo visible para clientes.</span>
                         </label>
                     </div>
-                    <div id="image-preview" class="mt-2 hidden">
-                        <img id="preview-img" class="h-24 rounded-lg border border-gray-200 object-cover">
-                    </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Clave Z</label>
-                        <input type="text" id="form-clave-z" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Alfanumérico">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Clave SCJ</label>
-                        <input type="text" id="form-clave-scj" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Alfanumérico">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">UPC</label>
-                        <input type="text" id="form-upc" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Código de barras">
-                    </div>
-                </div>
+                <!-- Error display (in scroll area) -->
+                <div id="form-error" class="hidden bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg mt-4"></div>
+            </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Precio (MXN)</label>
-                    <input type="number" step="0.01" id="form-price" class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0.00">
-                </div>
-
-                <div class="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-lg p-3">
-                    <input type="checkbox" id="form-show-codes" checked class="w-5 h-5 text-blue-600 focus:ring-blue-500 rounded">
-                    <label for="form-show-codes" class="text-sm text-gray-700 cursor-pointer">
-                        Mostrar producto en el catálogo público (imagen, nombre, ficha técnica)
-                    </label>
-                </div>
-
-                <div id="form-error" class="hidden bg-red-50 text-red-600 text-sm p-3 rounded-lg"></div>
-
-                <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                    <button onclick="closeForm()" class="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition">Cancelar</button>
-                    <button onclick="saveProduct()" id="form-save-btn" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition">Guardar</button>
-                </div>
+            <!-- STICKY BOTTOM ACTIONS (thumb-zone) -->
+            <div class="bg-white border-t border-gray-100 px-4 py-3 sm:p-4 flex gap-2 safe-bottom">
+                <button id="btn-prev" onclick="prevStep()" class="hidden flex-1 sm:flex-none px-4 py-3 sm:py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition text-base sm:text-sm">
+                    ← Atrás
+                </button>
+                <button id="btn-cancel" onclick="closeForm()" class="hidden sm:block px-4 py-2.5 text-gray-500 hover:text-gray-700 font-medium transition text-sm">
+                    Cancelar
+                </button>
+                <div class="flex-1 sm:hidden"></div>
+                <button id="btn-next" onclick="nextStep()" class="flex-1 sm:flex-none px-6 py-3 sm:py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-md transition text-base sm:text-sm">
+                    Siguiente →
+                </button>
+                <button id="btn-save" onclick="saveProduct()" class="hidden flex-1 sm:flex-none px-6 py-3 sm:py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold rounded-xl shadow-md transition text-base sm:text-sm">
+                    ✓ Guardar
+                </button>
             </div>
         </div>
     </div>
@@ -442,27 +517,40 @@
         }
 
         // --- FORM ---
-        function openForm(productId) {
+        const DRAFT_KEY = 'pcz-admin-product-draft';
+        const DRAFT_DEBOUNCE_MS = 500;
+        const FORM_FIELDS = ['form-name', 'form-description', 'form-category', 'form-brand',
+                             'form-image', 'form-clave-z', 'form-clave-scj', 'form-upc',
+                             'form-price', 'form-show-codes'];
+        const STEP_LABELS = ['Información Básica', 'Imagen', 'Códigos & Precio'];
+        let currentStep = 1;
+        let draftTimer = null;
+
+        function clearFormFields() {
             document.getElementById('form-id').value = '';
-            document.getElementById('form-name').value = '';
-            document.getElementById('form-description').value = '';
-            document.getElementById('form-category').value = '';
-            document.getElementById('form-brand').value = '';
-            document.getElementById('form-image').value = '';
-            document.getElementById('form-clave-z').value = '';
-            document.getElementById('form-clave-scj').value = '';
-            document.getElementById('form-upc').value = '';
-            document.getElementById('form-price').value = '';
-            document.getElementById('form-show-codes').checked = true;
+            FORM_FIELDS.forEach(id => {
+                const el = document.getElementById(id);
+                if (el.type === 'checkbox') el.checked = (id === 'form-show-codes');
+                else el.value = '';
+            });
             document.getElementById('form-error').classList.add('hidden');
-            document.getElementById('image-preview').classList.add('hidden');
+            removeImage();
+        }
+
+        function openForm() {
+            clearFormFields();
             document.getElementById('form-title').innerText = 'Nuevo Producto';
+            goToStep(1);
+            // Show draft restoration banner only when a saved draft exists
+            document.getElementById('draft-banner').classList.toggle('hidden', !hasDraft());
             document.getElementById('formModal').classList.remove('hidden');
+            setTimeout(() => document.getElementById('form-name').focus(), 150);
         }
 
         function editProduct(id) {
             const p = allProducts.find(x => x.id === id);
             if (!p) return;
+            clearFormFields();
             document.getElementById('form-id').value = p.id;
             document.getElementById('form-name').value = p.name || '';
             document.getElementById('form-description').value = p.description || '';
@@ -474,41 +562,185 @@
             document.getElementById('form-upc').value = p.upc || '';
             document.getElementById('form-price').value = p.price || '';
             document.getElementById('form-show-codes').checked = p.show_codes !== 0;
-            document.getElementById('form-error').classList.add('hidden');
             document.getElementById('form-title').innerText = 'Editar Producto';
+            document.getElementById('draft-banner').classList.add('hidden'); // never restore drafts when editing
 
-            // Show image preview if exists
-            if (p.image) {
-                document.getElementById('preview-img').src = formatThumb(p.image);
-                document.getElementById('image-preview').classList.remove('hidden');
-            } else {
-                document.getElementById('image-preview').classList.add('hidden');
-            }
+            if (p.image) showImagePreview(formatThumb(p.image));
 
+            goToStep(1);
             document.getElementById('formModal').classList.remove('hidden');
         }
 
         function closeForm() {
             document.getElementById('formModal').classList.add('hidden');
+            // Draft is intentionally preserved — user may close accidentally
         }
 
-        async function uploadImage(input) {
-            if (!input.files || !input.files[0]) return;
-            const formData = new FormData();
-            formData.append('image', input.files[0]);
+        // --- STEP NAVIGATION ---
+        function goToStep(step) {
+            currentStep = step;
+            [1, 2, 3].forEach(s => {
+                document.getElementById('form-step-' + s).classList.toggle('hidden', s !== step);
+                const bar = document.getElementById('step-bar-' + s);
+                bar.classList.toggle('bg-blue-600', s <= step);
+                bar.classList.toggle('bg-gray-200', s > step);
+            });
+            document.getElementById('step-label').innerText = `Paso ${step} de 3 · ${STEP_LABELS[step - 1]}`;
+            document.getElementById('btn-prev').classList.toggle('hidden', step === 1);
+            document.getElementById('btn-next').classList.toggle('hidden', step === 3);
+            document.getElementById('btn-save').classList.toggle('hidden', step !== 3);
+            document.getElementById('form-content-scroll').scrollTop = 0;
+            document.getElementById('form-error').classList.add('hidden');
+        }
 
-            const res = await fetch('/admin/upload', { method: 'POST', body: formData });
-            if (res.ok) {
+        function nextStep() {
+            if (currentStep === 1 && !document.getElementById('form-name').value.trim()) {
+                const errEl = document.getElementById('form-error');
+                errEl.innerText = 'El nombre es requerido para continuar.';
+                errEl.classList.remove('hidden');
+                document.getElementById('form-name').focus();
+                return;
+            }
+            if (currentStep < 3) goToStep(currentStep + 1);
+        }
+
+        function prevStep() {
+            if (currentStep > 1) goToStep(currentStep - 1);
+        }
+
+        // --- IMAGE HANDLING (instant preview + background upload) ---
+        function showImagePreview(src) {
+            document.getElementById('preview-img').src = src;
+            document.getElementById('dropzone-empty').classList.add('hidden');
+            document.getElementById('dropzone-preview').classList.remove('hidden');
+            document.getElementById('image-actions').classList.remove('hidden');
+        }
+
+        function handleImageFile(file) {
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                alert('Por favor selecciona una imagen válida.');
+                return;
+            }
+            if (file.size > 5 * 1024 * 1024) {
+                alert('La imagen no debe superar 5MB.');
+                return;
+            }
+
+            // Instant local preview (FileReader → DataURL) — no network wait
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                showImagePreview(e.target.result);
+                document.getElementById('upload-progress').classList.remove('hidden');
+                document.getElementById('upload-progress-bar').style.width = '40%';
+            };
+            reader.readAsDataURL(file);
+
+            // Upload to server in background
+            uploadImageToServer(file);
+        }
+
+        async function uploadImageToServer(file) {
+            const formData = new FormData();
+            formData.append('image', file);
+            try {
+                const res = await fetch('/admin/upload', { method: 'POST', body: formData });
+                if (!res.ok) throw new Error('Upload failed');
                 const data = await res.json();
                 document.getElementById('form-image').value = data.url;
-                document.getElementById('preview-img').src = data.url;
-                document.getElementById('image-preview').classList.remove('hidden');
-            } else {
-                alert('Error al subir la imagen.');
+                document.getElementById('preview-img').src = data.url; // swap dataurl for server url
+                document.getElementById('upload-progress-bar').style.width = '100%';
+                setTimeout(() => document.getElementById('upload-progress').classList.add('hidden'), 400);
+                saveDraft();
+            } catch (e) {
+                alert('Error al subir la imagen. Inténtalo de nuevo.');
+                removeImage();
             }
-            input.value = '';
+            document.getElementById('form-image-file').value = '';
         }
 
+        function removeImage() {
+            document.getElementById('form-image').value = '';
+            document.getElementById('preview-img').src = '';
+            document.getElementById('dropzone-empty').classList.remove('hidden');
+            document.getElementById('dropzone-preview').classList.add('hidden');
+            document.getElementById('image-actions').classList.add('hidden');
+            document.getElementById('upload-progress').classList.add('hidden');
+            saveDraft();
+        }
+
+        // --- DRAFT PERSISTENCE (localStorage) ---
+        function saveDraft() {
+            clearTimeout(draftTimer);
+            draftTimer = setTimeout(() => {
+                try {
+                    // Only persist drafts for NEW products, never for edits
+                    if (document.getElementById('form-id').value) return;
+                    const draft = {
+                        step: currentStep,
+                        name: document.getElementById('form-name').value,
+                        description: document.getElementById('form-description').value,
+                        category: document.getElementById('form-category').value,
+                        brand: document.getElementById('form-brand').value,
+                        image: document.getElementById('form-image').value,
+                        clave_z: document.getElementById('form-clave-z').value,
+                        clave_scj: document.getElementById('form-clave-scj').value,
+                        upc: document.getElementById('form-upc').value,
+                        price: document.getElementById('form-price').value,
+                        show_codes: document.getElementById('form-show-codes').checked,
+                        savedAt: Date.now()
+                    };
+                    const hasContent = ['name','description','category','brand','image','clave_z','clave_scj','upc','price']
+                        .some(k => (draft[k] || '').toString().trim());
+                    if (hasContent) localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+                    else localStorage.removeItem(DRAFT_KEY);
+                } catch (e) { console.warn('No se pudo guardar borrador:', e); }
+            }, DRAFT_DEBOUNCE_MS);
+        }
+
+        function hasDraft() {
+            try { return !!localStorage.getItem(DRAFT_KEY); } catch (e) { return false; }
+        }
+
+        function restoreDraft() {
+            try {
+                const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}');
+                if (!draft) return;
+                document.getElementById('form-name').value = draft.name || '';
+                document.getElementById('form-description').value = draft.description || '';
+                document.getElementById('form-category').value = draft.category || '';
+                document.getElementById('form-brand').value = draft.brand || '';
+                document.getElementById('form-image').value = draft.image || '';
+                document.getElementById('form-clave-z').value = draft.clave_z || '';
+                document.getElementById('form-clave-scj').value = draft.clave_scj || '';
+                document.getElementById('form-upc').value = draft.upc || '';
+                document.getElementById('form-price').value = draft.price || '';
+                document.getElementById('form-show-codes').checked = draft.show_codes !== false;
+                if (draft.image) showImagePreview(draft.image);
+                goToStep(draft.step || 1);
+                document.getElementById('draft-banner').classList.add('hidden');
+            } catch (e) { console.warn('Error restaurando borrador:', e); }
+        }
+
+        function discardDraft() {
+            try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+            document.getElementById('draft-banner').classList.add('hidden');
+        }
+
+        function clearDraft() {
+            try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+        }
+
+        function setupDraftAutoSave() {
+            FORM_FIELDS.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const evt = el.type === 'checkbox' ? 'change' : 'input';
+                el.addEventListener(evt, saveDraft);
+            });
+        }
+
+        // --- SAVE ---
         async function saveProduct() {
             const id = document.getElementById('form-id').value;
             const body = {
@@ -528,33 +760,39 @@
             if (!body.name) {
                 errEl.innerText = 'El nombre es requerido.';
                 errEl.classList.remove('hidden');
+                goToStep(1);
                 return;
             }
 
-            const btn = document.getElementById('form-save-btn');
+            const btn = document.getElementById('btn-save');
             btn.disabled = true;
             btn.innerText = 'Guardando...';
 
             const url = id ? `/admin/products/${id}` : '/admin/products';
             const method = id ? 'PUT' : 'POST';
 
-            const res = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-
-            if (res.ok) {
-                closeForm();
-                await loadProducts();
-            } else {
-                const data = await res.json();
-                errEl.innerText = data.error || 'Error al guardar.';
+            try {
+                const res = await fetch(url, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (res.ok) {
+                    if (!id) clearDraft(); // clear draft only on successful create
+                    closeForm();
+                    await loadProducts();
+                } else {
+                    const data = await res.json();
+                    errEl.innerText = data.error || 'Error al guardar.';
+                    errEl.classList.remove('hidden');
+                }
+            } catch (e) {
+                errEl.innerText = 'Error de red. Inténtalo de nuevo.';
                 errEl.classList.remove('hidden');
             }
 
             btn.disabled = false;
-            btn.innerText = 'Guardar';
+            btn.innerText = '✓ Guardar';
         }
 
         // --- DELETE ---
@@ -580,6 +818,7 @@
         }
 
         // --- INIT ---
+        setupDraftAutoSave();
         checkAuth();
     </script>
 </body>
